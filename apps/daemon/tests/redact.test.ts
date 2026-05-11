@@ -79,6 +79,18 @@ describe('redactSecrets', () => {
     expect(redactSecrets('x-goog-api-key: google-secret-789, next header')).toBe(
       'x-goog-api-key: [REDACTED:api_key_header], next header',
     );
+    expect(redactSecrets('{"x-api-key":"secret-value-123"}')).toBe(
+      '{"x-api-key":"[REDACTED:api_key_header]"}',
+    );
+    expect(redactSecrets('{"x-api-key": "secret-value-123"}')).toBe(
+      '{"x-api-key": "[REDACTED:api_key_header]"}',
+    );
+    expect(redactSecrets('{"api-key":"secret-value-123"}')).toBe(
+      '{"api-key":"[REDACTED:api_key_header]"}',
+    );
+    expect(redactSecrets('{"x-goog-api-key":"secret-value-123"}')).toBe(
+      '{"x-goog-api-key":"[REDACTED:api_key_header]"}',
+    );
   });
 
   it('redacts API key query values while keeping URL structure', () => {
