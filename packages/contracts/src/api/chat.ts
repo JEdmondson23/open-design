@@ -3,6 +3,7 @@ import type {
   PreviewCommentMember,
   PreviewCommentPosition,
   PreviewCommentSelectionKind,
+  PreviewVisualMarkKind,
 } from './comments';
 import type { ResearchOptions } from './research';
 
@@ -110,6 +111,9 @@ export interface ChatCommentAttachment {
   selectionKind?: PreviewCommentSelectionKind;
   memberCount?: number;
   podMembers?: PreviewCommentMember[];
+  screenshotPath?: string;
+  markKind?: PreviewVisualMarkKind;
+  intent?: string;
   source?: 'saved-comment' | 'board-batch';
 }
 

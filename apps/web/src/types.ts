@@ -47,6 +47,7 @@ import type {
   PreviewCommentStatus,
   PreviewCommentTarget,
   PreviewCommentUpsertRequest,
+  PreviewVisualMarkKind,
   ProjectDisplayStatus,
   ProjectFile,
   ProjectFileKind,
@@ -75,6 +76,7 @@ export type {
   OrbitStatusResponse,
   PreviewCommentMember,
   PreviewCommentSelectionKind,
+  PreviewVisualMarkKind,
 } from '@open-design/contracts';
 
 export type ExecMode = 'daemon' | 'api';

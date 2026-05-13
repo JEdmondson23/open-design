@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
 
 import { Icon } from './Icon';
+import type { PreviewVisualMarkKind } from '../types';
 
 export type PreviewDrawMode = 'click' | 'draw';
 
 interface Point { x: number; y: number }
 interface Stroke { points: Point[] }
 interface CaptureTarget {
+  filePath?: string;
   elementId?: string;
+  selector?: string;
   label?: string;
+  text?: string;
   position: { x: number; y: number; width: number; height: number };
+  htmlHint?: string;
 }
 
 export const ANNOTATION_EVENT = 'opendesign:annotation';
@@ -18,6 +23,10 @@ export interface AnnotationEventDetail {
   file: File | null;
   note: string;
   action: 'queue' | 'send';
+  filePath?: string;
+  markKind?: PreviewVisualMarkKind;
+  bounds?: { x: number; y: number; width: number; height: number };
+  target?: CaptureTarget | null;
 }
 
 interface Props {
@@ -26,6 +35,7 @@ interface Props {
   onActiveChange?: (active: boolean) => void;
   onModeChange?: (mode: PreviewDrawMode) => void;
   captureTarget?: CaptureTarget | null;
+  filePath?: string;
   sendDisabled?: boolean;
   sendDisabledReason?: string;
 }
@@ -41,6 +51,7 @@ export function PreviewDrawOverlay({
   onActiveChange,
   onModeChange,
   captureTarget = null,
+  filePath,
   sendDisabled = false,
   sendDisabledReason,
 }: Props) {
@@ -152,6 +163,45 @@ export function PreviewDrawOverlay({
     drawingRef.current = null;
     setHasInk(false);
     redraw();
+  }
+
+  function strokeBounds(): { x: number; y: number; width: number; height: number } | null {
+    const points = strokesRef.current.flatMap((stroke) => stroke.points);
+    if (points.length === 0) return null;
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const pad = 8;
+    return {
+      x: Math.max(0, minX - pad),
+      y: Math.max(0, minY - pad),
+      width: Math.max(1, maxX - minX + pad * 2),
+      height: Math.max(1, maxY - minY + pad * 2),
+    };
+  }
+
+  function annotationBounds(): { x: number; y: number; width: number; height: number } | undefined {
+    const stroke = strokeBounds();
+    const target = captureTarget?.position ?? null;
+    if (!stroke && !target) return undefined;
+    if (!stroke) return target ?? undefined;
+    if (!target) return stroke;
+    const left = Math.min(stroke.x, target.x);
+    const top = Math.min(stroke.y, target.y);
+    const right = Math.max(stroke.x + stroke.width, target.x + target.width);
+    const bottom = Math.max(stroke.y + stroke.height, target.y + target.height);
+    return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
+  }
+
+  function markKind(): PreviewVisualMarkKind | undefined {
+    const hasTarget = Boolean(captureTarget);
+    if (hasTarget && hasInk) return 'click+stroke';
+    if (hasTarget) return 'click';
+    if (hasInk) return 'stroke';
+    return undefined;
   }
 
   async function requestSnapshot(): Promise<{ dataUrl: string; w: number; h: number } | null> {
@@ -290,7 +340,16 @@ export function PreviewDrawOverlay({
           file = new File([blob], `drawing-${ts}.png`, { type: 'image/png' });
         }
       }
-      const detail: AnnotationEventDetail = { file, note: note.trim(), action };
+      const kind = markKind();
+      const detail: AnnotationEventDetail = {
+        file,
+        note: note.trim(),
+        action,
+        filePath: captureTarget?.filePath || filePath,
+        markKind: kind,
+        bounds: kind ? annotationBounds() : undefined,
+        target: captureTarget,
+      };
       window.dispatchEvent(new CustomEvent(ANNOTATION_EVENT, { detail }));
       clearInk();
       setNote('');
@@ -409,27 +468,31 @@ export function PreviewDrawOverlay({
               'Queue'
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => void send('send')}
-            disabled={sending || !canSend}
-            title={sendDisabled ? sendDisabledReason : undefined}
-            aria-label={sendDisabled && sendDisabledReason ? `Send (${sendDisabledReason})` : undefined}
-            style={{
-              ...pillStyle(true),
-              opacity: canSend ? 1 : 0.4,
-              cursor: sending ? 'wait' : (canSend ? 'pointer' : 'not-allowed'),
-            }}
-          >
-            {pendingAction === 'send' ? (
-              <>
-                <Icon name="spinner" size={12} />
-                <span>Sending...</span>
-              </>
-            ) : (
-              'Send'
-            )}
-          </button>
+          {sendDisabled ? (
+            <span title={sendDisabledReason} style={{ opacity: 0.7, fontSize: 12 }}>
+              Queues while working
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void send('send')}
+              disabled={sending || !canSend}
+              style={{
+                ...pillStyle(true),
+                opacity: canSend ? 1 : 0.4,
+                cursor: sending ? 'wait' : (canSend ? 'pointer' : 'not-allowed'),
+              }}
+            >
+              {pendingAction === 'send' ? (
+                <>
+                  <Icon name="spinner" size={12} />
+                  <span>Sending...</span>
+                </>
+              ) : (
+                'Send'
+              )}
+            </button>
+          )}
         </div>
       ) : null}
     </div>

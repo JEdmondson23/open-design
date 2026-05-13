@@ -65,6 +65,96 @@ describe('ChatComposer /search command', () => {
     );
   });
 
+  it('sends draw screenshots with paired visual target context', async () => {
+    const onSend = vi.fn();
+    mockedUploadProjectFiles.mockResolvedValue({
+      uploaded: [{ path: 'uploads/drawing.png', name: 'drawing.png', kind: 'image' }],
+      failed: [],
+    });
+
+    render(
+      <ChatComposer
+        projectId="project-1"
+        projectFiles={[]}
+        streaming={false}
+        onEnsureProject={async () => 'project-1'}
+        onSend={onSend}
+        onStop={vi.fn()}
+      />,
+    );
+
+    window.dispatchEvent(new CustomEvent(ANNOTATION_EVENT, {
+      detail: {
+        file: new File(['drawing'], 'drawing.png', { type: 'image/png' }),
+        note: 'make this card clearer',
+        action: 'send',
+        filePath: 'index.html',
+        markKind: 'click+stroke',
+        bounds: { x: 10, y: 20, width: 300, height: 120 },
+        target: {
+          filePath: 'index.html',
+          elementId: 'metric-card',
+          selector: '[data-od-id="metric-card"]',
+          label: 'Metric card',
+          text: '3 important emails',
+          position: { x: 10, y: 20, width: 300, height: 120 },
+          htmlHint: '<div data-od-id="metric-card">',
+        },
+      },
+    }));
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    const [prompt, attachments, commentAttachments] = onSend.mock.calls[0]!;
+    expect(prompt).toBe('make this card clearer');
+    expect(attachments).toEqual([{ path: 'uploads/drawing.png', name: 'drawing.png', kind: 'image' }]);
+    expect(commentAttachments).toHaveLength(1);
+    expect(commentAttachments[0]).toMatchObject({
+      selectionKind: 'visual',
+      screenshotPath: 'uploads/drawing.png',
+      markKind: 'click+stroke',
+      elementId: 'metric-card',
+      selector: '[data-od-id="metric-card"]',
+      comment: 'make this card clearer',
+      intent: expect.stringContaining('blue focus box and red strokes'),
+    });
+  });
+
+  it('queues draw screenshots with visual target chips while streaming', async () => {
+    const onSend = vi.fn();
+    mockedUploadProjectFiles.mockResolvedValue({
+      uploaded: [{ path: 'uploads/drawing.png', name: 'drawing.png', kind: 'image' }],
+      failed: [],
+    });
+
+    render(
+      <ChatComposer
+        projectId="project-1"
+        projectFiles={[]}
+        streaming
+        onEnsureProject={async () => 'project-1'}
+        onSend={onSend}
+        onStop={vi.fn()}
+      />,
+    );
+
+    window.dispatchEvent(new CustomEvent(ANNOTATION_EVENT, {
+      detail: {
+        file: new File(['drawing'], 'drawing.png', { type: 'image/png' }),
+        note: 'tighten this area',
+        action: 'send',
+        filePath: 'index.html',
+        markKind: 'stroke',
+        bounds: { x: 12, y: 24, width: 140, height: 80 },
+      },
+    }));
+
+    await waitFor(() => expect(screen.getByText('Visual mark')).toBeTruthy());
+    expect(screen.getByText('drawing.png')).toBeTruthy();
+    expect(screen.getByText('tighten this area')).toBeTruthy();
+    expect((screen.getByTestId('chat-composer-input') as HTMLTextAreaElement).value).toBe('');
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
   it('previews a staged image attachment from its chip', () => {
     render(
       <ChatComposer

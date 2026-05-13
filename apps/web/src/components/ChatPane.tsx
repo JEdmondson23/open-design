@@ -1003,7 +1003,7 @@ function UserMessage({
           {commentAttachments.map((a) => (
             <span key={a.id} className="user-attachment staged-comment">
               <span className="staged-name" title={`${a.elementId}: ${a.comment}`}>
-                <strong>{a.elementId}</strong>
+                <strong>{a.selectionKind === 'visual' ? 'Visual mark' : a.elementId}</strong>
                 <span>{a.comment}</span>
               </span>
             </span>

@@ -5435,6 +5435,7 @@ function HtmlViewer({
                   onActiveChange={setDrawOverlayOpen}
                   onModeChange={setDrawOverlayMode}
                   captureTarget={drawClickSelectionMode ? activeCommentTarget : null}
+                  filePath={file.name}
                   sendDisabled={streaming}
                   sendDisabledReason="当前正有任务在执行"
                 >
