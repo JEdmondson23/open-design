@@ -2472,9 +2472,10 @@ function buildMetadata(input: {
         : input.tab;
   const selectedPlatforms = normalizeSelectedPlatforms(input.platformTargets);
   const concreteTargets = platformTargetsFor(selectedPlatforms);
+  const canIncludeOsWidgets = platformTargetsSupportOsWidgets(concreteTargets);
   const surfaceOptions = {
     ...(input.includeLandingPage ? { includeLandingPage: true } : {}),
-    ...(input.includeOsWidgets ? { includeOsWidgets: true } : {}),
+    ...(input.includeOsWidgets && canIncludeOsWidgets ? { includeOsWidgets: true } : {}),
   };
   const base = {
     platform: selectedPlatforms[0],

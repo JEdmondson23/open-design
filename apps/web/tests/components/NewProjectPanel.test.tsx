@@ -148,6 +148,35 @@ describe('NewProjectPanel design system defaults', () => {
     );
   });
 
+  it('does not persist OS widgets metadata for web-only platform targets', () => {
+    const onCreate = vi.fn();
+    render(
+      <NewProjectPanel
+        skills={skills}
+        designSystems={designSystems}
+        defaultDesignSystemId="clay"
+        templates={[]}
+        promptTemplates={[]}
+        onCreate={onCreate}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('new-project-name'), {
+      target: { value: 'Responsive web payload' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /OS widgets/i }));
+    fireEvent.click(screen.getByTestId('create-project'));
+
+    const payload = onCreate.mock.calls[0]?.[0];
+    expect(payload.metadata).toEqual(
+      expect.objectContaining({
+        platform: 'responsive',
+        platformTargets: ['responsive'],
+      }),
+    );
+    expect(payload.metadata).not.toHaveProperty('includeOsWidgets');
+  });
+
   it('clears design system metadata when freeform is selected in multi mode', () => {
     const onCreate = vi.fn();
     render(
