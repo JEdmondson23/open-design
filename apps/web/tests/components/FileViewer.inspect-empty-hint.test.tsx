@@ -76,6 +76,7 @@ describe('FileViewer Inspect/Picker empty-annotation hint (#890)', () => {
     render(
       <FileViewer
         projectId="project-1"
+        projectKind="prototype"
         file={htmlFile()}
         liveHtml="<html><body><h1>Plain PRD with no data-od-id</h1></body></html>"
       />,
@@ -107,6 +108,7 @@ describe('FileViewer Inspect/Picker empty-annotation hint (#890)', () => {
     render(
       <FileViewer
         projectId="project-1"
+        projectKind="prototype"
         file={htmlFile()}
         liveHtml="<html><body><main data-od-id='hero'>Hero</main></body></html>"
       />,
@@ -132,6 +134,7 @@ describe('FileViewer Inspect/Picker empty-annotation hint (#890)', () => {
     render(
       <FileViewer
         projectId="project-1"
+        projectKind="prototype"
         file={htmlFile()}
         liveHtml="<html><body><h1>No annotations</h1></body></html>"
       />,

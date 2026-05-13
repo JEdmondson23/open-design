@@ -340,6 +340,8 @@ export interface StudioViewArtifactProps {
   // never the raw filename.
   artifact_id: string;
   artifact_kind: TrackingArtifactKind;
+  project_id: string;
+  project_kind: TrackingProjectKind;
 }
 
 export interface StudioClickShareOptionProps {
@@ -350,6 +352,8 @@ export interface StudioClickShareOptionProps {
   action: 'select_share_option';
   share_context: 'artifact';
   export_format: TrackingExportFormat;
+  project_id: string;
+  project_kind: TrackingProjectKind;
 }
 
 export interface ArtifactExportResultProps {
@@ -357,6 +361,7 @@ export interface ArtifactExportResultProps {
   area: 'app_header';
   artifact_id: string;
   project_id: string;
+  project_kind: TrackingProjectKind;
   export_format: TrackingExportFormat;
   result: TrackingExportResult;
   error_code?: string;
