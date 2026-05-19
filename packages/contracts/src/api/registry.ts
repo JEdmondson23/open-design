@@ -354,6 +354,10 @@ export interface ImportLocalDesignSystemRequest {
   baseDir: string;
   /** Optional display name override for the generated design-system project. */
   name?: string;
+  /** Import structure mode. Defaults to hybrid for real project imports. */
+  importMode?: 'normalized' | 'hybrid' | 'verbatim';
+  /** Craft sections that should actively apply when this system is used. */
+  craftApplies?: string[];
 }
 
 export interface ImportLocalDesignSystemResponse {
@@ -367,6 +371,10 @@ export interface ImportGitHubDesignSystemRequest {
   branch?: string;
   /** Optional display name override for the generated design-system project. */
   name?: string;
+  /** Import structure mode. Defaults to hybrid for real project imports. */
+  importMode?: 'normalized' | 'hybrid' | 'verbatim';
+  /** Craft sections that should actively apply when this system is used. */
+  craftApplies?: string[];
 }
 
 export interface ImportGitHubDesignSystemResponse {

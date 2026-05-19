@@ -8061,13 +8061,6 @@ export async function startServer({
 
     let craftBody;
     let craftSections;
-    if (skillCraftRequires.length > 0) {
-      const loaded = await loadCraftSections(CRAFT_DIR, skillCraftRequires);
-      if (loaded.body) {
-        craftBody = loaded.body;
-        craftSections = loaded.sections;
-      }
-    }
 
     // Personal-memory body is always recomputed at compose time so a
     // memory the user just edited in settings shows up on the very next
@@ -8112,6 +8105,9 @@ export async function startServer({
     let designSystemComponentsManifest;
     let designSystemFixtureHtml;
     let designSystemPullIndex;
+    let designSystemImportMode;
+    let designSystemCraftApplies = [];
+    let designSystemCraftExemptions = [];
     if (effectiveDesignSystemId) {
       let systems = await listAllDesignSystems();
       let summary = systems.find((s) => s.id === effectiveDesignSystemId);
@@ -8142,6 +8138,21 @@ export async function startServer({
         designSystemComponentsManifest = assets.componentsManifest;
         designSystemFixtureHtml = assets.fixtureHtml;
         designSystemPullIndex = assets.pullIndex;
+        designSystemImportMode = assets.importMode;
+        designSystemCraftApplies = Array.isArray(assets.craftApplies) ? assets.craftApplies : [];
+        designSystemCraftExemptions = Array.isArray(assets.craftExemptions) ? assets.craftExemptions : [];
+      }
+    }
+
+    const excludedCraft = new Set(designSystemCraftExemptions);
+    const requestedCraft = Array.from(
+      new Set([...skillCraftRequires, ...designSystemCraftApplies]),
+    ).filter((slug) => !excludedCraft.has(slug));
+    if (requestedCraft.length > 0) {
+      const loaded = await loadCraftSections(CRAFT_DIR, requestedCraft);
+      if (loaded.body) {
+        craftBody = loaded.body;
+        craftSections = loaded.sections;
       }
     }
 
@@ -8301,6 +8312,7 @@ export async function startServer({
       designSystemComponentsManifest,
       designSystemFixtureHtml,
       designSystemPullIndex,
+      designSystemImportMode,
       craftBody,
       craftSections,
       memoryBody,

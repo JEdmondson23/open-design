@@ -197,4 +197,22 @@ describe('importLocalDesignSystemProject', () => {
     expect(first.id).toBe('kami-app-2');
     expect(second.id).toBe('kami-app-3');
   });
+
+  it('writes selected importMode and applied craft semantics into manifest', async () => {
+    const result = await importLocalDesignSystemProject(sourceRoot, userDesignSystemsRoot, {
+      now: new Date('2026-05-18T09:00:00.000Z'),
+      importMode: 'verbatim',
+      craftApplies: ['color', 'accessibility-baseline', 'color'],
+    });
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(result.dir, 'manifest.json'), 'utf8')) as Record<string, unknown>;
+    expect(manifest).toMatchObject({
+      importMode: 'verbatim',
+      craft: {
+        applies: ['color', 'accessibility-baseline'],
+        suggested: [],
+        exemptions: [],
+      },
+    });
+  });
 });

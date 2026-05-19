@@ -137,6 +137,12 @@ type DesignSystemProjectManifest = {
     tokens?: string;
     snippets?: string;
   };
+  importMode?: 'normalized' | 'hybrid' | 'verbatim';
+  craft?: {
+    applies?: string[];
+    suggested?: string[];
+    exemptions?: string[];
+  };
 };
 
 export type DesignSystemProvenance = {
@@ -387,6 +393,9 @@ export type DesignSystemAssets = {
   fixtureHtml?: string | undefined;
   componentsManifest?: string | undefined;
   pullIndex?: string | undefined;
+  importMode?: 'normalized' | 'hybrid' | 'verbatim' | undefined;
+  craftApplies?: string[] | undefined;
+  craftExemptions?: string[] | undefined;
 };
 
 export async function readDesignSystemAssets(
@@ -411,6 +420,9 @@ export async function readDesignSystemAssets(
     fixtureHtml,
     componentsManifestJson,
     pullIndex: buildDesignSystemPullIndex(manifest),
+    importMode: manifest?.importMode,
+    craftApplies: manifest?.craft?.applies,
+    craftExemptions: manifest?.craft?.exemptions,
   });
 }
 
@@ -475,6 +487,9 @@ export async function resolveDesignSystemAssets(
       fixtureHtml: undefined,
       componentsManifest: undefined,
       pullIndex: undefined,
+      importMode: undefined,
+      craftApplies: undefined,
+      craftExemptions: undefined,
     };
   }
 
@@ -491,12 +506,25 @@ export async function resolveDesignSystemAssets(
     componentsManifestJson: undefined,
     componentsManifest: builtIn.componentsManifest ?? userInstalled.componentsManifest,
     pullIndex: builtIn.pullIndex ?? userInstalled.pullIndex,
+    importMode: builtIn.importMode ?? userInstalled.importMode,
+    craftApplies: builtIn.craftApplies ?? userInstalled.craftApplies,
+    craftExemptions: builtIn.craftExemptions ?? userInstalled.craftExemptions,
   });
 }
 
 function withComponentsManifest(
   designSystemId: string,
-  assets: Pick<DesignSystemAssets, 'usageMd' | 'tokensCss' | 'fixtureHtml' | 'componentsManifest' | 'pullIndex'> & {
+  assets: Pick<
+    DesignSystemAssets,
+    | 'usageMd'
+    | 'tokensCss'
+    | 'fixtureHtml'
+    | 'componentsManifest'
+    | 'pullIndex'
+    | 'importMode'
+    | 'craftApplies'
+    | 'craftExemptions'
+  > & {
     componentsManifestJson?: string | undefined;
   },
 ): DesignSystemAssets {

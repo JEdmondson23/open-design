@@ -15,6 +15,8 @@ export type LocalDesignSystemImportOptions = {
   fallbackName?: string;
   reservedIds?: Iterable<string>;
   source?: DesignSystemProjectSource;
+  importMode?: 'normalized' | 'hybrid' | 'verbatim';
+  craftApplies?: string[];
 };
 
 export type DesignSystemProjectSource =
@@ -135,6 +137,8 @@ export async function importLocalDesignSystemProject(
   const id = await nextAvailableSlug(userDesignSystemsRoot, slugify(displayName), options.reservedIds);
   const outDir = path.join(userDesignSystemsRoot, id);
   await mkdir(outDir, { recursive: true });
+  const importMode = normalizeImportMode(options.importMode);
+  const craftApplies = normalizeCraftList(options.craftApplies);
 
   const files = ['USAGE.md', 'DESIGN.md', 'tokens.css', 'components.html', 'components.manifest.json', 'manifest.json'];
   const designMd = renderDesignMd(id, displayName, scan);
@@ -159,7 +163,11 @@ export async function importLocalDesignSystemProject(
   files.push(...(await writeSourceEvidenceFiles(outDir, scan)));
   await writeFile(
     path.join(outDir, 'manifest.json'),
-    `${JSON.stringify(renderManifest(id, displayName, scan, options.now ?? new Date(), options.source), null, 2)}\n`,
+    `${JSON.stringify(
+      renderManifest(id, displayName, scan, options.now ?? new Date(), options.source, importMode, craftApplies),
+      null,
+      2,
+    )}\n`,
     'utf8',
   );
 
@@ -410,6 +418,8 @@ function renderManifest(
   scan: ProjectScan,
   now: Date,
   sourceOverride: DesignSystemProjectSource | undefined,
+  importMode: 'normalized' | 'hybrid' | 'verbatim',
+  craftApplies: string[],
 ) {
   const importedAt = now.toISOString();
   const source = sourceOverride ?? {
@@ -434,10 +444,10 @@ function renderManifest(
     },
     usage: 'USAGE.md',
     componentsManifest: 'components.manifest.json',
-    importMode: 'hybrid',
+    importMode,
     craft: {
-      applies: [],
-      suggested: ['color'],
+      applies: craftApplies,
+      suggested: craftApplies.includes('color') ? [] : ['color'],
       exemptions: [],
     },
     ...(scan.assets.length > 0 ? { assetsDir: 'assets' } : {}),
@@ -467,6 +477,24 @@ function renderManifest(
       snippets: 'source/snippets/INDEX.json',
     },
   };
+}
+
+function normalizeImportMode(value: unknown): 'normalized' | 'hybrid' | 'verbatim' {
+  return value === 'normalized' || value === 'verbatim' || value === 'hybrid' ? value : 'hybrid';
+}
+
+function normalizeCraftList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const slug = entry.trim().toLowerCase();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || seen.has(slug)) continue;
+    seen.add(slug);
+    out.push(slug);
+  }
+  return out;
 }
 
 function renderDesignMd(id: string, name: string, scan: ProjectScan): string {

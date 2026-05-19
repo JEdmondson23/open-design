@@ -254,6 +254,12 @@ describe('Design System Project manifest runtime consumption', () => {
         },
         usage: 'USAGE.md',
         componentsManifest: 'components.manifest.json',
+        importMode: 'verbatim',
+        craft: {
+          applies: ['color'],
+          suggested: [],
+          exemptions: ['typography'],
+        },
         assetsDir: 'assets',
         fonts: [{ family: 'Inter', weight: 500, file: 'fonts/Inter-Medium.woff2' }],
         preview: {
@@ -316,6 +322,9 @@ describe('Design System Project manifest runtime consumption', () => {
 
     const assets = await readDesignSystemAssets(root, 'hybrid-project');
     expect(assets.usageMd).toContain('Use cache first');
+    expect(assets.importMode).toBe('verbatim');
+    expect(assets.craftApplies).toEqual(['color']);
+    expect(assets.craftExemptions).toEqual(['typography']);
     expect(assets.componentsManifest).toContain('components.manifest schema v1 for cache-brand');
     expect(assets.componentsManifest).toContain('Cached buttons');
     expect(assets.pullIndex).toContain('preview/colors.html: Colors; colors');

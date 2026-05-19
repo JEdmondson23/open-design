@@ -425,6 +425,18 @@ describe('composeSystemPrompt', () => {
       expect(prompt).toContain('Keep the push prompt light');
     });
 
+    it('adds importMode guidance when the manifest declares consumption semantics', () => {
+      const prompt = composeSystemPrompt({
+        designSystemTitle: 'source-heavy',
+        designSystemBody: '# x\n\nbody',
+        designSystemImportMode: 'verbatim',
+      });
+
+      expect(prompt).toContain('## Design system import mode — source-heavy');
+      expect(prompt).toContain('Preserve source semantics and source naming');
+      expect(prompt).toContain('pull-layer source evidence or snippets');
+    });
+
     it('places the tokens + component manifest blocks AFTER the DESIGN.md prose block (prose sets voice, structured form binds names)', () => {
       const prompt = composeSystemPrompt({
         designSystemTitle: 'default',

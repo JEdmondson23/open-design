@@ -15,10 +15,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseDesignSystemProjectManifest } from "../design-systems/_schema/manifest.schema.ts";
+import type { DesignSystemProjectManifest } from "../design-systems/_schema/manifest.schema.ts";
 import { extractComponentsManifest } from "../packages/contracts/src/design-systems/components-manifest.ts";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const designSystemsRoot = path.join(repoRoot, "design-systems");
+const craftRoot = path.join(repoRoot, "craft");
 const SKIPPED_DIRECTORIES = new Set(["_schema"]);
 
 function toRepositoryPath(filePath: string): string {
@@ -58,6 +60,7 @@ async function discoverManifestPaths(): Promise<string[]> {
 
 export async function checkDesignSystemManifests(): Promise<boolean> {
   const manifestPaths = await discoverManifestPaths();
+  const craftSlugs = await discoverCraftSlugs();
   const violations: string[] = [];
 
   for (const manifestPath of manifestPaths) {
@@ -75,6 +78,7 @@ export async function checkDesignSystemManifests(): Promise<boolean> {
     if (manifest.id !== folderSlug) {
       violations.push(`${repositoryManifestPath}: $.id must match folder slug "${folderSlug}"`);
     }
+    validateManifestSemantics(violations, repositoryManifestPath, manifest, craftSlugs);
 
     const requiredFiles = [
       manifest.files.design,
@@ -114,6 +118,59 @@ export async function checkDesignSystemManifests(): Promise<boolean> {
     `Design system manifest check passed: ${manifestPaths.length} project manifest${manifestPaths.length === 1 ? "" : "s"} valid; DESIGN.md-only systems skipped.`,
   );
   return true;
+}
+
+async function discoverCraftSlugs(): Promise<Set<string>> {
+  try {
+    const entries = await readdir(craftRoot, { withFileTypes: true });
+    return new Set(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md")
+        .map((entry) => entry.name.slice(0, -".md".length)),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export function validateManifestSemantics(
+  violations: string[],
+  repositoryManifestPath: string,
+  manifest: DesignSystemProjectManifest,
+  craftSlugs: ReadonlySet<string>,
+): void {
+  const applies = manifest.craft?.applies ?? [];
+  const suggested = manifest.craft?.suggested ?? [];
+  const exemptions = manifest.craft?.exemptions ?? [];
+  const declaredCraft = [
+    ...applies.map((slug) => ({ slug, field: "applies" })),
+    ...suggested.map((slug) => ({ slug, field: "suggested" })),
+    ...exemptions.map((slug) => ({ slug, field: "exemptions" })),
+  ];
+  for (const { slug, field } of declaredCraft) {
+    if (!craftSlugs.has(slug)) {
+      violations.push(`${repositoryManifestPath}: $.craft.${field} references unknown craft "${slug}"`);
+    }
+  }
+
+  const exemptionsSet = new Set(exemptions);
+  for (const slug of applies) {
+    if (exemptionsSet.has(slug)) {
+      violations.push(`${repositoryManifestPath}: craft "${slug}" cannot be both applied and exempted`);
+    }
+  }
+
+  if (manifest.importMode === "hybrid" && manifest.source?.type !== "bundled" && manifest.sourceFiles === undefined) {
+    violations.push(`${repositoryManifestPath}: hybrid imports must declare sourceFiles evidence`);
+  }
+  if (manifest.importMode === "verbatim" && manifest.source?.type !== "bundled") {
+    if (manifest.sourceFiles?.tokens === undefined) {
+      violations.push(`${repositoryManifestPath}: verbatim imports must declare sourceFiles.tokens`);
+    }
+    if (manifest.sourceFiles?.snippets === undefined) {
+      violations.push(`${repositoryManifestPath}: verbatim imports must declare sourceFiles.snippets`);
+    }
+  }
 }
 
 async function requireDeclaredPathExists(

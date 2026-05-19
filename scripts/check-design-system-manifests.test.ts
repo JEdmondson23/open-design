@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   DESIGN_SYSTEM_PROJECT_SCHEMA_VERSION,
+  type DesignSystemProjectManifest,
   validateDesignSystemProjectManifest,
 } from "../design-systems/_schema/manifest.schema.ts";
+import { validateManifestSemantics } from "./check-design-system-manifests.ts";
 
 test("design-system project manifest schema accepts the v1 minimum shape", () => {
   const result = validateDesignSystemProjectManifest({
@@ -121,7 +123,7 @@ test("design-system project manifest schema accepts import-project optional inde
     importMode: "hybrid",
     craft: {
       applies: ["color"],
-      suggested: ["accessibility"],
+      suggested: ["accessibility-baseline"],
       exemptions: [],
     },
     fonts: [
@@ -150,6 +152,66 @@ test("design-system project manifest schema accepts import-project optional inde
     assert.equal(result.manifest.importMode, "hybrid");
     assert.equal(result.manifest.preview?.pages.length, 2);
   }
+});
+
+test("design-system project manifest schema requires craft slug format", () => {
+  const result = validateDesignSystemProjectManifest({
+    schemaVersion: DESIGN_SYSTEM_PROJECT_SCHEMA_VERSION,
+    id: "cherry-studio",
+    name: "Cherry Studio",
+    category: "AI & LLM",
+    source: { type: "local", path: "/tmp/cherry-studio" },
+    files: {
+      design: "DESIGN.md",
+      tokens: "tokens.css",
+    },
+    craft: {
+      applies: ["Color"],
+      suggested: ["accessibility baseline"],
+      exemptions: [""],
+    },
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    const errors = result.errors.join("\n");
+    assert.match(errors, /\$\.craft\.applies\[0\]/);
+    assert.match(errors, /\$\.craft\.suggested\[0\]/);
+    assert.match(errors, /\$\.craft\.exemptions\[0\]/);
+  }
+});
+
+test("design-system manifest semantics connect craft and importMode declarations to known evidence", () => {
+  const manifest: DesignSystemProjectManifest = {
+    schemaVersion: DESIGN_SYSTEM_PROJECT_SCHEMA_VERSION,
+    id: "cherry-studio",
+    name: "Cherry Studio",
+    category: "AI & LLM",
+    source: { type: "local", path: "/tmp/cherry-studio" },
+    files: {
+      design: "DESIGN.md",
+      tokens: "tokens.css",
+    },
+    importMode: "verbatim",
+    craft: {
+      applies: ["color", "missing-craft"],
+      suggested: [],
+      exemptions: ["color"],
+    },
+    sourceFiles: {
+      scanned: "source/scanned-files.json",
+    },
+  };
+  const violations: string[] = [];
+
+  validateManifestSemantics(violations, "design-systems/cherry-studio/manifest.json", manifest, new Set(["color"]));
+
+  assert.deepEqual(violations, [
+    'design-systems/cherry-studio/manifest.json: $.craft.applies references unknown craft "missing-craft"',
+    'design-systems/cherry-studio/manifest.json: craft "color" cannot be both applied and exempted',
+    "design-systems/cherry-studio/manifest.json: verbatim imports must declare sourceFiles.tokens",
+    "design-systems/cherry-studio/manifest.json: verbatim imports must declare sourceFiles.snippets",
+  ]);
 });
 
 test("design-system project manifest schema rejects unsafe import-project paths", () => {

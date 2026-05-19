@@ -110,9 +110,9 @@ export type DesignSystemProjectManifest = {
   readonly usage?: string;
   /** Optional rebuildable cache derived from components.html + tokens.css. */
   readonly componentsManifest?: string;
-  /** Optional importer mode metadata. Runtime does not consume this in PR0. */
+  /** Importer mode metadata. Defaults to hybrid for imported packages. */
   readonly importMode?: DesignSystemProjectImportMode;
-  /** Optional craft metadata. Runtime and guard semantics are deferred. */
+  /** Optional craft metadata consumed by prompt assembly and guard checks. */
   readonly craft?: DesignSystemProjectCraft;
   /** Optional webfont files copied into the package. */
   readonly fonts?: readonly DesignSystemProjectFont[];
@@ -268,9 +268,9 @@ function validateCraft(errors: string[], value: unknown): void {
   }
 
   rejectUnknownKeys(errors, "$.craft", value, ALLOWED_CRAFT_KEYS);
-  expectStringArray(errors, "$.craft.applies", value.applies);
-  expectStringArray(errors, "$.craft.suggested", value.suggested);
-  expectStringArray(errors, "$.craft.exemptions", value.exemptions);
+  expectSlugArray(errors, "$.craft.applies", value.applies);
+  expectSlugArray(errors, "$.craft.suggested", value.suggested);
+  expectSlugArray(errors, "$.craft.exemptions", value.exemptions);
 }
 
 function validateFonts(errors: string[], value: unknown): void {
@@ -362,15 +362,15 @@ function expectNonEmptyString(errors: string[], pathLabel: string, value: unknow
   }
 }
 
-function expectStringArray(errors: string[], pathLabel: string, value: unknown): void {
+function expectSlugArray(errors: string[], pathLabel: string, value: unknown): void {
   if (!Array.isArray(value)) {
-    errors.push(`${pathLabel} must be an array of strings`);
+    errors.push(`${pathLabel} must be an array of lowercase slugs`);
     return;
   }
 
   value.forEach((entry, index) => {
-    if (typeof entry !== "string" || entry.trim().length === 0) {
-      errors.push(`${pathLabel}[${index}] must be a non-empty string`);
+    if (typeof entry !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry)) {
+      errors.push(`${pathLabel}[${index}] must be a lowercase slug matching /^[a-z0-9]+(?:-[a-z0-9]+)*$/`);
     }
   });
 }

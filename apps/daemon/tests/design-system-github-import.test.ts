@@ -99,6 +99,8 @@ exit 1
       {
         gitBin: fakeGit,
         now: new Date('2026-05-18T10:00:00.000Z'),
+        importMode: 'normalized',
+        craftApplies: ['color'],
       },
     );
 
@@ -121,7 +123,10 @@ exit 1
       },
       usage: 'USAGE.md',
       componentsManifest: 'components.manifest.json',
-      importMode: 'hybrid',
+      importMode: 'normalized',
+      craft: {
+        applies: ['color'],
+      },
       sourceFiles: {
         scanned: 'source/scanned-files.json',
         evidence: 'source/evidence.md',
