@@ -236,6 +236,39 @@ describe('OrbitService', () => {
     }
   });
 
+  it('localizes the persisted agent summary when the handler returns the server summary text', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'orbit-test-'));
+    try {
+      const service = new OrbitService(dataDir);
+      service.setRunHandler(async () => ({
+        projectId: 'project-1',
+        agentRunId: 'agent-1',
+        completion: Promise.resolve({
+          agentRunId: 'agent-1',
+          status: 'succeeded',
+          artifactId: 'artifact-1',
+          artifactProjectId: 'project-1',
+          summary: 'Agent succeeded and registered live artifact Daily Orbit Digest.',
+        }),
+      }));
+
+      await service.start('manual', { locale: 'zh-CN' });
+
+      let status = await service.status();
+      for (let attempt = 0; attempt < 10 && (status.running || !status.lastRun); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        status = await service.status();
+      }
+
+      expect(status.lastRun?.markdown).toContain('- 摘要: Agent 成功并注册了实时产物 Daily Orbit Digest。');
+      expect(status.lastRun?.markdown).not.toContain(
+        '- 摘要: Agent succeeded and registered live artifact Daily Orbit Digest.',
+      );
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unsupported manual run locales before building prompts', async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'orbit-test-'));
     try {
@@ -739,7 +772,11 @@ describe('OrbitService', () => {
       await service.start('manual');
       for (
         let attempt = 0;
-        attempt < 10 && (status.running || status.lastRunsByTemplate['orbit-general']?.agentRunId !== 'agent-3');
+        attempt < 10 && (
+          status.running ||
+          status.lastRunsByTemplate['orbit-general']?.agentRunId !== 'agent-3' ||
+          status.lastRun?.agentRunId !== 'agent-3'
+        );
         attempt += 1
       ) {
         await vi.advanceTimersByTimeAsync(1);

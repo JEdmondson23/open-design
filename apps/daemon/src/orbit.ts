@@ -382,7 +382,12 @@ const ORBIT_SUMMARY_COPY = {
     error: 'Error',
     triggerValue: { manual: 'manual', scheduled: 'scheduled' },
     statusValue: { succeeded: 'succeeded', skipped: 'skipped', failed: 'failed' },
+    agentStatusValue: { succeeded: 'succeeded', failed: 'failed', canceled: 'canceled' },
     agentRunSummary: (status: OrbitAgentRunResult['status']) => `Agent run ${status}.`,
+    agentRegisteredArtifactSummary: (status: OrbitAgentRunResult['status'], artifactTitle: string) =>
+      `Agent ${status} and registered live artifact ${artifactTitle}.`,
+    agentNoArtifactSummary: (status: OrbitAgentRunResult['status']) =>
+      `Agent ${status} but did not register a live artifact for this Orbit run.`,
   },
   'zh-CN': {
     title: 'Orbit 每日活动摘要',
@@ -396,13 +401,42 @@ const ORBIT_SUMMARY_COPY = {
     error: '错误',
     triggerValue: { manual: '手动', scheduled: '定时' },
     statusValue: { succeeded: '成功', skipped: '跳过', failed: '失败' },
+    agentStatusValue: { succeeded: '成功', failed: '失败', canceled: '已取消' },
     agentRunSummary: (status: OrbitAgentRunResult['status']) =>
       status === 'succeeded' ? 'Agent 运行成功。' : status === 'failed' ? 'Agent 运行失败。' : 'Agent 运行已取消。',
+    agentRegisteredArtifactSummary: (status: OrbitAgentRunResult['status'], artifactTitle: string) =>
+      `Agent ${ORBIT_SUMMARY_COPY['zh-CN'].agentStatusValue[status]}并注册了实时产物 ${artifactTitle}。`,
+    agentNoArtifactSummary: (status: OrbitAgentRunResult['status']) =>
+      `Agent ${ORBIT_SUMMARY_COPY['zh-CN'].agentStatusValue[status]}，但未为本次 Orbit 运行注册实时产物。`,
   },
 } as const;
 
 function orbitSummaryCopy(locale: string | null) {
   return ORBIT_SUMMARY_COPY[locale as keyof typeof ORBIT_SUMMARY_COPY] ?? ORBIT_SUMMARY_COPY.en;
+}
+
+function localizeOrbitAgentSummary(summary: string, locale: string | null): string {
+  const copy = orbitSummaryCopy(locale);
+  if (copy === ORBIT_SUMMARY_COPY.en) return summary;
+
+  const registeredMatch = /^Agent (succeeded|failed|canceled) and registered live artifact ([\s\S]+)\.$/.exec(summary);
+  if (registeredMatch) {
+    const artifactTitle = registeredMatch[2];
+    if (!artifactTitle) return summary;
+    return copy.agentRegisteredArtifactSummary(
+      registeredMatch[1] as OrbitAgentRunResult['status'],
+      artifactTitle,
+    );
+  }
+
+  const noArtifactMatch =
+    /^Agent (succeeded|failed|canceled) but did not register a live artifact for this Orbit run\.(?:\n\n([\s\S]+))?$/.exec(summary);
+  if (noArtifactMatch) {
+    const localized = copy.agentNoArtifactSummary(noArtifactMatch[1] as OrbitAgentRunResult['status']);
+    return noArtifactMatch[2] ? `${localized}\n\n${noArtifactMatch[2]}` : localized;
+  }
+
+  return summary;
 }
 
 function renderMarkdown(summary: Omit<OrbitActivitySummary, 'markdown'>, locale: string | null): string {
@@ -646,7 +680,9 @@ export class OrbitService {
             connectorId: 'agent-runtime',
             connectorName: 'Orbit Agent',
             status: agentResult.status === 'succeeded' ? 'succeeded' : agentResult.status === 'failed' ? 'failed' : 'skipped',
-            summary: agentResult.summary ?? orbitSummaryCopy(runOptions.locale).agentRunSummary(agentResult.status),
+            summary: agentResult.summary
+              ? localizeOrbitAgentSummary(agentResult.summary, runOptions.locale)
+              : orbitSummaryCopy(runOptions.locale).agentRunSummary(agentResult.status),
           } satisfies OrbitConnectorRunResult],
         };
         const summary: OrbitActivitySummary = {
