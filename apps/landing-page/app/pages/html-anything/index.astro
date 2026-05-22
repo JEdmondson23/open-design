@@ -28,6 +28,43 @@ const HA_URL = `https://github.com/${HA_REPO}`;
 const HA_REPO_API = `https://api.github.com/repos/${HA_REPO}`;
 
 /*
+ * SEO-targeted page titles per locale. Pattern: noun-stack with no
+ * separators — `{open-source} HTML Anything {official}`. The English
+ * tokens "Open Source" and "Official" capture brand-defense queries:
+ *   - "open source html anything"  (researching alternatives)
+ *   - "html anything official"     (verifying the canonical source)
+ *   - "open source html anything official"  (precise long tail)
+ *
+ * Each non-English locale translates the surrounding tokens so a
+ * user searching in their own language still lands on a title that
+ * matches their query, while "HTML Anything" stays untranslated as
+ * a brand. Word order follows whatever feels natural in each locale
+ * (German: Offiziell at end; French: adjectives after noun; CJK:
+ * adjectives before noun) rather than a slavish copy of the English
+ * stack — Google tokenizes regardless of order.
+ */
+const OPEN_SOURCE_OFFICIAL_TITLE: Record<LandingLocaleCode, string> = {
+  en:      'Open Source HTML Anything Official',
+  zh:      '开源 HTML Anything 官方',
+  'zh-tw': '開源 HTML Anything 官方',
+  ja:      'オープンソース HTML Anything 公式',
+  ko:      '오픈 소스 HTML Anything 공식',
+  de:      'Open Source HTML Anything Offiziell',
+  fr:      'HTML Anything Open Source Officiel',
+  ru:      'HTML Anything Open Source Официальный',
+  es:      'HTML Anything Open Source Oficial',
+  'pt-br': 'HTML Anything Open Source Oficial',
+  it:      'HTML Anything Open Source Ufficiale',
+  vi:      'HTML Anything Open Source Chính thức',
+  pl:      'HTML Anything Open Source Oficjalny',
+  id:      'HTML Anything Open Source Resmi',
+  nl:      'HTML Anything Open Source Officieel',
+  ar:      'HTML Anything مفتوح المصدر الرسمي',
+  tr:      'HTML Anything Açık Kaynak Resmi',
+  uk:      'HTML Anything Open Source Офіційний',
+};
+
+/*
  * Imagery sourced directly from the HA repo via raw.githubusercontent.com.
  * This is a temporary CDN — for production polish a follow-up should mirror
  * these PNGs into the same Cloudflare R2 bucket (`open-design-static`) the
@@ -153,7 +190,7 @@ type HtmlAnythingCopy = {
 };
 
 const HTML_ANYTHING_COPY_EN: HtmlAnythingCopy = {
-  title: 'HTML Anything — your local AI agent writes the HTML, you ship it | Open Design',
+  title: OPEN_SOURCE_OFFICIAL_TITLE.en,
   description:
     'HTML Anything is the agentic HTML editor from the Open Design family. Reuse the coding-agent CLI you already authenticated — Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Qwen, Aider — to turn Markdown, CSV, or JSON into ship-ready HTML for WeChat, X, Zhihu, and Xiaohongshu. Open-source, Apache-2.0.',
   label: 'Sister project',
@@ -294,7 +331,7 @@ const HTML_ANYTHING_COPY_EN: HtmlAnythingCopy = {
 
 const HTML_ANYTHING_COPY_ZH: HtmlAnythingCopy = {
   ...HTML_ANYTHING_COPY_EN,
-  title: 'HTML Anything — 本地 AI Agent 写 HTML，你负责发布 | Open Design',
+  title: OPEN_SOURCE_OFFICIAL_TITLE.zh,
   description:
     'HTML Anything 是 Open Design 家族里的 Agent 原生 HTML 编辑器。复用你已经登录的 Claude Code、Codex、Cursor、Gemini、Copilot、OpenCode、Qwen、Aider，把 Markdown、CSV 或 JSON 变成可交付 HTML。',
   label: '姊妹项目',
@@ -395,7 +432,7 @@ const HTML_ANYTHING_COPY_ZH: HtmlAnythingCopy = {
 
 const HTML_ANYTHING_COPY_ZH_TW: HtmlAnythingCopy = {
   ...HTML_ANYTHING_COPY_ZH,
-  title: 'HTML Anything — 本地 AI Agent 寫 HTML，你負責發布 | Open Design',
+  title: OPEN_SOURCE_OFFICIAL_TITLE['zh-tw'],
   description:
     'HTML Anything 是 Open Design 家族裡的 Agent 原生 HTML 編輯器。複用你已經登入的 Claude Code、Codex、Cursor、Gemini、Copilot、OpenCode、Qwen、Aider，把 Markdown、CSV 或 JSON 變成可交付 HTML。',
   label: '姊妹專案',
@@ -509,7 +546,7 @@ function derivedHtmlAnythingCopy(locale: LandingLocaleCode): HtmlAnythingCopy {
 
   return {
     ...HTML_ANYTHING_COPY_EN,
-    title: `${product.htmlAnythingName} — ${product.htmlAnythingBlurb} | Open Design`,
+    title: OPEN_SOURCE_OFFICIAL_TITLE[locale] ?? OPEN_SOURCE_OFFICIAL_TITLE.en,
     description: `${product.htmlAnythingBlurb} ${summary}`,
     label: product.product,
     heading: product.htmlAnythingBlurb,
@@ -699,6 +736,12 @@ const jsonLd: Array<Record<string, unknown>> = [
       'htmlanything',
       'HTML Anything Editor',
       'The agentic HTML editor',
+      // Brand-defense + canonical-source queries: keep these stacked
+      // alongside the descriptive variants above so the structured
+      // entity matches whichever shape the user typed.
+      'open source html anything',
+      'html anything official',
+      'open source html anything official',
     ],
     applicationCategory: 'DeveloperApplication',
     operatingSystem: 'macOS, Linux, Windows',
