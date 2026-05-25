@@ -53,6 +53,7 @@ task.md
 specs/change/active
 .ralph/
 docs/superpowers/
+**/flavor.json
 
 # Nix and direnv
 .direnv/
