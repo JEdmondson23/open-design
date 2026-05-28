@@ -23,7 +23,18 @@ vi.mock('../../src/i18n', () => ({
       'common.untitled': 'Untitled',
       'entry.navDesignSystems': 'Design systems',
       'entry.navHome': 'Home',
+      'entry.navIntegrations': 'Integrations',
+      'entry.navPlugins': 'Plugins',
       'entry.navProjects': 'Projects',
+      'entry.navTasks': 'Automations',
+      'workspaceNav.title': 'Workspace',
+      'workspaceTabs.newTab': 'New tab',
+      'workspaceTabs.noTabsFound': 'No tabs found',
+      'workspaceTabs.openTabs': 'Open tabs',
+      'workspaceTabs.openWorkspaces': 'Open workspaces',
+      'workspaceTabs.searchTabs': 'Search tabs',
+      'workspaceTabs.startNewProject': 'Start a new project',
+      'workspaceTabs.tabsAria': 'Workspace tabs',
     };
     return labels[key] ?? key;
   },

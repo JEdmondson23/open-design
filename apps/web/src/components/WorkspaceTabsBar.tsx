@@ -448,12 +448,12 @@ export function WorkspaceTabsBar({ route, projects }: Props) {
   }
 
   return (
-    <header className="app-chrome-header workspace-tabs-chrome" aria-label="Workspace tabs">
+    <header className="app-chrome-header workspace-tabs-chrome" aria-label={t('workspaceTabs.tabsAria')}>
       <div className="app-chrome-traffic-space workspace-tabs-traffic" aria-hidden />
       <div
         className="workspace-tabs-strip"
         role="tablist"
-        aria-label="Open workspaces"
+        aria-label={t('workspaceTabs.openWorkspaces')}
         ref={stripRef}
       >
         {/* Render every open tab — the strip itself scrolls horizontally
@@ -505,8 +505,8 @@ export function WorkspaceTabsBar({ route, projects }: Props) {
           type="button"
           className="workspace-tabs-new-btn"
           onClick={createNewTab}
-          title="New tab"
-          aria-label="New tab"
+          title={t('workspaceTabs.newTab')}
+          aria-label={t('workspaceTabs.newTab')}
         >
           <Icon name="plus" size={14} />
         </button>
@@ -514,8 +514,8 @@ export function WorkspaceTabsBar({ route, projects }: Props) {
           type="button"
           className={`workspace-tabs-icon-btn${tabsMenuOpen ? ' is-active' : ''}`}
           onClick={() => setTabsMenuOpen((open) => !open)}
-          title="Search tabs"
-          aria-label="Search tabs"
+          title={t('workspaceTabs.searchTabs')}
+          aria-label={t('workspaceTabs.searchTabs')}
           aria-haspopup="dialog"
           aria-expanded={tabsMenuOpen}
         >
@@ -526,7 +526,7 @@ export function WorkspaceTabsBar({ route, projects }: Props) {
               <div
                 className="workspace-tabs-popover"
                 role="dialog"
-                aria-label="Search tabs"
+                aria-label={t('workspaceTabs.searchTabs')}
                 ref={popoverRef}
               >
                 <div className="workspace-tabs-search">
@@ -535,15 +535,15 @@ export function WorkspaceTabsBar({ route, projects }: Props) {
                     ref={searchInputRef}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search tabs"
-                    aria-label="Search tabs"
+                    placeholder={t('workspaceTabs.searchTabs')}
+                    aria-label={t('workspaceTabs.searchTabs')}
                   />
                 </div>
                 <div className="workspace-tabs-popover__section">
-                  <span>Open tabs</span>
+                  <span>{t('workspaceTabs.openTabs')}</span>
                   <span>{state.tabs.length}</span>
                 </div>
-                <div className="workspace-tabs-list" role="listbox" aria-label="Open tabs">
+                <div className="workspace-tabs-list" role="listbox" aria-label={t('workspaceTabs.openTabs')}>
                   {filteredTabs.length > 0 ? (
                     filteredTabs.map((display) => {
                       const active = display.id === state.activeTabId;
@@ -580,7 +580,7 @@ export function WorkspaceTabsBar({ route, projects }: Props) {
                       );
                     })
                   ) : (
-                    <div className="workspace-tabs-empty">No tabs found</div>
+                    <div className="workspace-tabs-empty">{t('workspaceTabs.noTabsFound')}</div>
                   )}
                 </div>
               </div>,
@@ -679,7 +679,7 @@ function displayTabFor(
     projects: t('entry.navProjects'),
     tasks: t('entry.navTasks'),
     plugins: t('entry.navPlugins'),
-    workspace: 'Workspace',
+    workspace: t('workspaceNav.title'),
     'design-systems': t('entry.navDesignSystems'),
     integrations: t('entry.navIntegrations'),
   };
@@ -696,7 +696,7 @@ function displayTabFor(
   return {
     id: tab.id,
     title: entryTitle[tab.view],
-    meta: tab.view === 'home' ? 'Start a new project' : 'Workspace',
+    meta: tab.view === 'home' ? t('workspaceTabs.startNewProject') : t('workspaceNav.title'),
     icon: entryIcon[tab.view],
     tab,
   };

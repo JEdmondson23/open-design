@@ -101,11 +101,11 @@ export function EntryNavRail({
   async function handleInviteMembers() {
     if (!currentWorkspace || creatingInvite) return;
     if (currentWorkspace.kind !== 'team') {
-      setWorkspaceNotice('Create or switch to a team workspace to invite members.');
+      setWorkspaceNotice(t('workspaceNav.inviteTeamRequired'));
       return;
     }
     if (!canInviteMembers) {
-      setWorkspaceNotice('Admin or owner access required.');
+      setWorkspaceNotice(t('workspaceSettings.adminOwnerRequired'));
       return;
     }
     const workspaceId = currentWorkspace.id;
@@ -119,12 +119,12 @@ export function EntryNavRail({
       }
       const link = result.value.inviteUrl;
       if (!link) {
-        setWorkspaceNotice('Could not create invite link.');
+        setWorkspaceNotice(t('workspaceSettings.inviteCreateFailed'));
         return;
       }
       try {
         await navigator.clipboard.writeText(link);
-        setWorkspaceNotice('Invite link copied.');
+        setWorkspaceNotice(t('workspaceSettings.inviteCopied'));
       } catch {
         setWorkspaceNotice(link);
       }
@@ -148,7 +148,7 @@ export function EntryNavRail({
       if (switchSerialRef.current === switchSerial && selectedWorkspaceIdRef.current === nextWorkspaceId) {
         selectedWorkspaceIdRef.current = previousWorkspaceId;
         setSelectedWorkspaceId(previousWorkspaceId);
-        setWorkspaceNotice(error instanceof Error ? error.message : 'Could not switch workspace.');
+        setWorkspaceNotice(error instanceof Error ? error.message : t('workspaceNav.switchFailed'));
       }
     } finally {
       if (switchSerialRef.current === switchSerial) {
@@ -158,7 +158,7 @@ export function EntryNavRail({
   }
 
   return (
-    <nav className="entry-nav-rail" aria-label="Primary">
+    <nav className="entry-nav-rail" aria-label={t('misc.primary')}>
       <div className="entry-nav-rail__group">
         <div className="entry-nav-workspace">
           <button
@@ -184,16 +184,16 @@ export function EntryNavRail({
             type="button"
             className={`entry-nav-rail__btn entry-workspace-trigger${workspaceOpen ? ' is-active' : ''}`}
             onClick={() => setWorkspaceOpen((open) => !open)}
-            aria-label={`Switch workspace: ${currentWorkspace?.name ?? 'Workspace'}`}
+            aria-label={t('workspaceNav.switchAria', { name: currentWorkspace?.name ?? t('workspaceNav.fallbackName') })}
             aria-expanded={workspaceOpen}
-            data-tooltip={currentWorkspace?.name ?? 'Workspace'}
+            data-tooltip={currentWorkspace?.name ?? t('workspaceNav.fallbackName')}
             data-testid="entry-workspace-trigger"
           >
             <Icon name="layers-filled" size={17} />
           </button>
           {workspaceOpen ? (
             <div className="entry-workspace-popover">
-              <div className="entry-workspace-title">Workspace</div>
+              <div className="entry-workspace-title">{t('workspaceNav.title')}</div>
               <select
                 className="entry-workspace-select"
                 value={selectedWorkspaceId}
@@ -213,7 +213,7 @@ export function EntryNavRail({
                 onClick={() => void handleInviteMembers()}
               >
                 <Icon name="link" size={13} />
-                <span>{creatingInvite ? 'Creating invite...' : 'Invite members'}</span>
+                <span>{creatingInvite ? t('workspaceSettings.creatingInvite') : t('workspaceNav.inviteMembers')}</span>
               </button>
               {workspaceNotice ? <div className="entry-workspace-notice">{workspaceNotice}</div> : null}
             </div>
@@ -257,8 +257,8 @@ export function EntryNavRail({
         </NavButton>
         <NavButton
           active={view === 'workspace'}
-          ariaLabel="Workspace"
-          tooltip="Workspace"
+          ariaLabel={t('workspaceNav.title')}
+          tooltip={t('workspaceNav.title')}
           onClick={() => onViewChange('workspace')}
           testId="entry-nav-workspace"
         >

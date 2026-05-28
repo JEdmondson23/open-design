@@ -6,14 +6,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EntryNavRail } from '../../src/components/EntryNavRail';
 
 vi.mock('../../src/i18n', () => ({
-  useT: () => (key: string) => {
+  useT: () => (key: string, vars?: Record<string, string | number>) => {
     const labels: Record<string, string> = {
       'app.brand': 'Open Design',
       'entry.helpAria': 'Help',
       'entry.navDesignSystems': 'Design systems',
       'entry.navHome': 'Home',
+      'entry.navIntegrations': 'Integrations',
       'entry.navNewProject': 'New project',
+      'entry.navPlugins': 'Plugins',
       'entry.navProjects': 'Projects',
+      'entry.navTasks': 'Automations',
+      'misc.primary': 'Primary',
+      'workspaceNav.fallbackName': 'Workspace',
+      'workspaceNav.inviteMembers': 'Invite members',
+      'workspaceNav.inviteTeamRequired': 'Create or switch to a team workspace to invite members.',
+      'workspaceNav.switchAria': `Switch workspace: ${vars?.name ?? 'Workspace'}`,
+      'workspaceNav.switchFailed': 'Could not switch workspace.',
+      'workspaceNav.title': 'Workspace',
+      'workspaceSettings.adminOwnerRequired': 'Admin or owner access required.',
+      'workspaceSettings.creatingInvite': 'Creating invite...',
+      'workspaceSettings.inviteCopied': 'Invite link copied.',
+      'workspaceSettings.inviteCreateFailed': 'Could not create invite link.',
     };
     return labels[key] ?? key;
   },

@@ -150,6 +150,10 @@ const PROJECT_STRING_FLAGS = new Set([
   'agent', 'model', 'snapshot-id', 'inputs', 'grant-caps', 'editor',
 ]);
 const PROJECT_BOOLEAN_FLAGS = new Set(['help', 'h', 'json', 'follow']);
+const WORKSPACE_STRING_FLAGS = new Set([
+  'daemon-url', 'name', 'role', 'expires-in-days', 'user', 'transfer-to',
+]);
+const WORKSPACE_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 // `od automation …` mirrors the Automations tab. Same surface, same
 // /api/routines store. The CLI form is the embeddability contract:
 // external agents (hermes-agent, openclaw, etc.) can drive Open Design
@@ -210,6 +214,8 @@ const SUBCOMMAND_MAP = {
   ui: runUi,
   marketplace: runMarketplace,
   project: runProject,
+  workspace: runWorkspace,
+  workspaces: runWorkspace,
   automation: runAutomation,
   automations: runAutomation,
   memory: runMemory,
@@ -4212,6 +4218,11 @@ async function runProject(args) {
                     [--base-url <url>] [--max-tokens <n>]
                     Synthesize a resume-conversation handoff prompt.
 
+  od workspace <list|current|switch|create|rename|delete|leave> [args]
+  od workspace <members|member-role|remove-member|transfer-owner> [args]
+  od workspace <invites|invite|revoke-invite|accept-invite> [args]
+                    Manage workspace selection, invites, members, and ownership.
+
 Common options:
   --daemon-url <url>   Open Design daemon HTTP base.
   --json               Emit raw JSON.`);
@@ -4359,6 +4370,244 @@ Common options:
       console.error(`unknown subcommand: od project ${sub}`);
       process.exit(2);
   }
+}
+
+async function runWorkspace(args) {
+  if (args.length === 0 || args[0] === 'help' || args.includes('--help') || args.includes('-h')) {
+    console.log(`Usage:
+  od workspace list [--json]
+  od workspace current [--json]
+  od workspace switch <workspaceId> [--json]
+  od workspace create --name "<name>" [--json]
+  od workspace rename <workspaceId> --name "<name>" [--json]
+  od workspace delete <workspaceId> [--json]
+  od workspace leave <workspaceId> [--json]
+  od workspace members <workspaceId> [--json]
+  od workspace member-role <workspaceId> <userId> --role <admin|member> [--json]
+  od workspace remove-member <workspaceId> <userId> [--transfer-to <userId>] [--json]
+  od workspace transfer-owner <workspaceId> --user <userId> [--json]
+  od workspace invites <workspaceId> [--json]
+  od workspace invite <workspaceId> [--role <member|admin>] [--expires-in-days <n>] [--json]
+  od workspace revoke-invite <workspaceId> <inviteId> [--json]
+  od workspace accept-invite <token> [--json]
+  od workspace activity <workspaceId> [--json]
+  od workspace shares <workspaceId> [--json]
+  od workspace revoke-share <workspaceId> <shareId> [--json]
+
+Common options:
+  --daemon-url <url>   Open Design daemon HTTP base.
+  --json               Emit raw JSON.`);
+    process.exit(args.length === 0 ? 2 : 0);
+  }
+  const sub = args[0];
+  const rest = args.slice(1);
+  let flags;
+  try {
+    flags = parseFlags(rest, { string: WORKSPACE_STRING_FLAGS, boolean: WORKSPACE_BOOLEAN_FLAGS });
+  } catch (err) {
+    console.error(err.message);
+    process.exit(2);
+  }
+  const base = (await cliDaemonBaseUrl(flags));
+  const positionals = workspacePositionals(rest);
+  const emit = (data, human) => {
+    if (flags.json) return process.stdout.write(JSON.stringify(data, null, 2) + '\n');
+    if (human) console.log(human(data));
+  };
+  const request = async (method, path, body) => {
+    const init = { method, headers: { 'content-type': 'application/json' } };
+    if (body !== undefined) init.body = JSON.stringify(body);
+    let resp;
+    try {
+      resp = await fetch(`${base}${path}`, init);
+    } catch (err) {
+      surfaceFetchError(err, base);
+      process.exit(3);
+    }
+    if (!resp.ok) return structuredHttpFailure(resp);
+    return resp.json().catch(() => ({}));
+  };
+  const need = (value, usage) => {
+    if (value) return value;
+    console.error(usage);
+    process.exit(2);
+  };
+
+  switch (sub) {
+    case 'list': {
+      const data = await request('GET', '/api/workspaces');
+      return emit(data, (payload) => {
+        const rows = payload?.workspaces ?? [];
+        if (rows.length === 0) return 'No workspaces.';
+        return rows.map((workspace) => {
+          const current = workspace.id === payload.currentWorkspaceId ? '*' : ' ';
+          return `${current} ${workspace.id}\t${workspace.name}\t${workspace.kind}\t${workspace.currentUserRole ?? '-'}`;
+        }).join('\n');
+      });
+    }
+    case 'current': {
+      const data = await request('GET', '/api/workspaces');
+      return emit(data, (payload) => {
+        const workspace = (payload?.workspaces ?? []).find((item) => item.id === payload.currentWorkspaceId);
+        return workspace
+          ? `${workspace.id}\t${workspace.name}\t${workspace.kind}\t${workspace.currentUserRole ?? '-'}`
+          : `${payload.currentWorkspaceId ?? '-'}`;
+      });
+    }
+    case 'switch': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace switch <workspaceId>');
+      const data = await request('PATCH', '/api/workspaces/current', { workspaceId });
+      return emit(data, () => `[workspace] switched to ${workspaceId}`);
+    }
+    case 'create': {
+      const name = typeof flags.name === 'string' ? flags.name.trim() : '';
+      if (!name) {
+        console.error('--name required');
+        process.exit(2);
+      }
+      const data = await request('POST', '/api/workspaces', { name });
+      return emit(data, (payload) => `[workspace] created ${payload.workspace?.id ?? ''}`);
+    }
+    case 'rename': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace rename <workspaceId> --name "<name>"');
+      const name = typeof flags.name === 'string' ? flags.name.trim() : '';
+      if (!name) {
+        console.error('--name required');
+        process.exit(2);
+      }
+      const data = await request('PATCH', `/api/workspaces/${encodeURIComponent(workspaceId)}`, { name });
+      return emit(data, (payload) => `[workspace] renamed ${payload.workspace?.id ?? workspaceId}`);
+    }
+    case 'delete': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace delete <workspaceId>');
+      const data = await request('DELETE', `/api/workspaces/${encodeURIComponent(workspaceId)}`);
+      return emit(data, () => `[workspace] deleted ${workspaceId}`);
+    }
+    case 'leave': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace leave <workspaceId>');
+      const data = await request('DELETE', `/api/workspaces/${encodeURIComponent(workspaceId)}/membership`);
+      return emit(data, () => `[workspace] left ${workspaceId}`);
+    }
+    case 'members': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace members <workspaceId>');
+      const data = await request('GET', `/api/workspaces/${encodeURIComponent(workspaceId)}/members`);
+      return emit(data, (payload) => {
+        const rows = payload?.members ?? [];
+        if (rows.length === 0) return 'No members.';
+        return rows.map((member) => `${member.userId}\t${member.role}\tjoined=${member.joinedAt}`).join('\n');
+      });
+    }
+    case 'member-role': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace member-role <workspaceId> <userId> --role <admin|member>');
+      const userId = need(positionals[1], 'Usage: od workspace member-role <workspaceId> <userId> --role <admin|member>');
+      const role = flags.role === 'admin' || flags.role === 'member' ? flags.role : '';
+      if (!role) {
+        console.error('--role must be admin or member');
+        process.exit(2);
+      }
+      const data = await request('PATCH', `/api/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(userId)}`, { role });
+      return emit(data, (payload) => `[workspace] ${payload.member?.userId ?? userId} is ${payload.member?.role ?? role}`);
+    }
+    case 'remove-member': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace remove-member <workspaceId> <userId> [--transfer-to <userId>]');
+      const userId = need(positionals[1], 'Usage: od workspace remove-member <workspaceId> <userId> [--transfer-to <userId>]');
+      const body = flags['transfer-to'] ? { transferToUserId: flags['transfer-to'] } : {};
+      const data = await request('DELETE', `/api/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(userId)}`, body);
+      return emit(data, () => `[workspace] removed ${userId}`);
+    }
+    case 'transfer-owner': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace transfer-owner <workspaceId> --user <userId>');
+      const userId = typeof flags.user === 'string' ? flags.user.trim() : '';
+      if (!userId) {
+        console.error('--user required');
+        process.exit(2);
+      }
+      const data = await request('POST', `/api/workspaces/${encodeURIComponent(workspaceId)}/owner`, { userId });
+      return emit(data, (payload) => `[workspace] owner transferred to ${payload.owner?.userId ?? userId}`);
+    }
+    case 'invites': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace invites <workspaceId>');
+      const data = await request('GET', `/api/workspaces/${encodeURIComponent(workspaceId)}/invites`);
+      return emit(data, (payload) => {
+        const rows = payload?.invites ?? [];
+        if (rows.length === 0) return 'No invites.';
+        return rows.map((invite) => `${invite.id}\t${invite.role}\t${invite.status}\t${invite.inviteUrl ?? '-'}`).join('\n');
+      });
+    }
+    case 'invite': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace invite <workspaceId> [--role <member|admin>] [--expires-in-days <n>]');
+      const role = flags.role === 'admin' ? 'admin' : flags.role === 'member' || flags.role == null ? 'member' : '';
+      if (!role) {
+        console.error('--role must be admin or member');
+        process.exit(2);
+      }
+      const expiresInDays = flags['expires-in-days'] == null ? undefined : Number(flags['expires-in-days']);
+      if (expiresInDays != null && (!Number.isFinite(expiresInDays) || expiresInDays <= 0)) {
+        console.error('--expires-in-days must be a positive number');
+        process.exit(2);
+      }
+      const data = await request('POST', `/api/workspaces/${encodeURIComponent(workspaceId)}/invites`, {
+        role,
+        ...(expiresInDays == null ? {} : { expiresInDays }),
+      });
+      return emit(data, (payload) => payload.invite?.inviteUrl ?? `[workspace] invite created ${payload.invite?.id ?? ''}`);
+    }
+    case 'revoke-invite': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace revoke-invite <workspaceId> <inviteId>');
+      const inviteId = need(positionals[1], 'Usage: od workspace revoke-invite <workspaceId> <inviteId>');
+      const data = await request('DELETE', `/api/workspaces/${encodeURIComponent(workspaceId)}/invites/${encodeURIComponent(inviteId)}`);
+      return emit(data, () => `[workspace] revoked invite ${inviteId}`);
+    }
+    case 'accept-invite': {
+      const token = need(positionals[0], 'Usage: od workspace accept-invite <token>');
+      const data = await request('POST', `/api/workspace-invites/${encodeURIComponent(token)}/accept`);
+      return emit(data, (payload) => `[workspace] joined ${payload.workspace?.name ?? payload.workspace?.id ?? ''}`);
+    }
+    case 'activity': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace activity <workspaceId>');
+      const data = await request('GET', `/api/workspaces/${encodeURIComponent(workspaceId)}/activity`);
+      return emit(data, (payload) => {
+        const rows = payload?.activities ?? [];
+        if (rows.length === 0) return 'No activity.';
+        return rows.map((activity) => `${activity.createdAt}\t${activity.actorUserId}\t${activity.action}\t${activity.targetId ?? '-'}`).join('\n');
+      });
+    }
+    case 'shares': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace shares <workspaceId>');
+      const data = await request('GET', `/api/workspaces/${encodeURIComponent(workspaceId)}/shares`);
+      return emit(data, (payload) => {
+        const rows = payload?.shares ?? [];
+        if (rows.length === 0) return 'No viewer links.';
+        return rows.map((share) => `${share.id}\t${share.projectName ?? share.projectId}\t${share.role}\t${share.shareUrl ?? '-'}`).join('\n');
+      });
+    }
+    case 'revoke-share': {
+      const workspaceId = need(positionals[0], 'Usage: od workspace revoke-share <workspaceId> <shareId>');
+      const shareId = need(positionals[1], 'Usage: od workspace revoke-share <workspaceId> <shareId>');
+      const data = await request('DELETE', `/api/workspaces/${encodeURIComponent(workspaceId)}/shares/${encodeURIComponent(shareId)}`);
+      return emit(data, () => `[workspace] revoked viewer link ${shareId}`);
+    }
+    default:
+      console.error(`unknown subcommand: od workspace ${sub}`);
+      process.exit(2);
+  }
+}
+
+function workspacePositionals(args) {
+  const positionals = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg.startsWith('-')) {
+      positionals.push(arg);
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      const eq = arg.indexOf('=');
+      const key = eq >= 0 ? arg.slice(2, eq) : arg.slice(2);
+      if (WORKSPACE_STRING_FLAGS.has(key) && eq < 0) i++;
+    }
+  }
+  return positionals;
 }
 
 async function runRun(args) {

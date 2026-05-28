@@ -26,7 +26,10 @@ import {
   updateWorkspaceMemberRoleResult,
   type WorkspaceOperationResult,
 } from '../state/workspaces';
+import { useT } from '../i18n';
 import { Icon } from './Icon';
+
+type TFn = ReturnType<typeof useT>;
 
 function isWorkspaceManagerRole(role: Workspace['currentUserRole']) {
   return role === 'owner' || role === 'admin';
@@ -48,106 +51,110 @@ interface Props {
   ) => Promise<WorkspaceOperationResult<WorkspaceInviteWithStatus>>;
 }
 
-function roleLabel(role: WorkspaceMembership['role']) {
-  if (role === 'owner') return 'Owner';
-  if (role === 'admin') return 'Admin';
-  return 'Member';
+function roleLabel(role: WorkspaceMembership['role'], t: TFn) {
+  if (role === 'owner') return t('workspaceSettings.roleOwner');
+  if (role === 'admin') return t('workspaceSettings.roleAdmin');
+  return t('workspaceSettings.roleMember');
 }
 
-function accessLabel(role: WorkspaceMembership['role'] | undefined) {
-  return role ? roleLabel(role) : 'Loading access';
+function accessLabel(role: WorkspaceMembership['role'] | undefined, t: TFn) {
+  return role ? roleLabel(role, t) : t('workspaceSettings.loadingAccess');
 }
 
-function capabilitySummary(role: WorkspaceMembership['role'] | undefined, isTeamWorkspace: boolean) {
-  if (!isTeamWorkspace) return 'Personal workspace: create projects and start a team workspace when you need collaboration.';
-  if (role === 'owner') return 'Owner: manage members, invites, viewer links, project moves, lifecycle, and ownership.';
-  if (role === 'admin') return 'Admin: manage members, invites, viewer links, and project moves.';
-  if (role === 'member') return 'Member: create and open workspace projects. Ask an admin for invites, viewer links, or management changes.';
-  return 'You do not have access to manage this workspace.';
+function capabilitySummary(role: WorkspaceMembership['role'] | undefined, isTeamWorkspace: boolean, t: TFn) {
+  if (!isTeamWorkspace) return t('workspaceSettings.capabilityPersonal');
+  if (role === 'owner') return t('workspaceSettings.capabilityOwner');
+  if (role === 'admin') return t('workspaceSettings.capabilityAdmin');
+  if (role === 'member') return t('workspaceSettings.capabilityMember');
+  return t('workspaceSettings.capabilityNoAccess');
 }
 
-function managerOnlyHint(canManage: boolean) {
-  return canManage ? null : <p className="workspace-settings__hint">Admin or owner access required.</p>;
+function managerOnlyHint(canManage: boolean, t: TFn) {
+  return canManage ? null : <p className="workspace-settings__hint">{t('workspaceSettings.adminOwnerRequired')}</p>;
 }
 
-function ownerOnlyHint(isOwner: boolean) {
-  return isOwner ? null : <p className="workspace-settings__hint">Owner access required.</p>;
+function ownerOnlyHint(isOwner: boolean, t: TFn) {
+  return isOwner ? null : <p className="workspace-settings__hint">{t('workspaceSettings.ownerRequired')}</p>;
 }
 
-function viewerLinksHint(canManage: boolean) {
+function viewerLinksHint(canManage: boolean, t: TFn) {
   return canManage
     ? null
-    : <p className="workspace-settings__hint">Admin or owner access required to view, copy, or revoke external viewer links.</p>;
+    : <p className="workspace-settings__hint">{t('workspaceSettings.viewerLinksManagerRequired')}</p>;
 }
 
-function activityLabel(activity: WorkspaceActivity) {
+function activityLabel(activity: WorkspaceActivity, t: TFn) {
   const metadata = activity.metadata ?? {};
   const target = activity.targetId ? ` ${activity.targetId}` : '';
-  const cleanup = activityCleanupLabel(metadata);
-  if (activity.action === 'workspace.created') return 'Created workspace';
-  if (activity.action === 'workspace.renamed') return `Renamed workspace to ${String(metadata.to ?? 'new name')}`;
-  if (activity.action === 'member.left') return `Left workspace${cleanup}`;
-  if (activity.action === 'member.removed') return `Removed member${target}${cleanup}`;
-  if (activity.action === 'member.role_updated') return `Changed member role to ${String(metadata.to ?? 'member')}${cleanup}`;
-  if (activity.action === 'owner.transferred') return `Transferred owner to ${String(metadata.ownerUserId ?? activity.targetId ?? 'member')}`;
-  if (activity.action === 'invite.created') return `Created ${String(metadata.role ?? 'member')} invite`;
+  const cleanup = activityCleanupLabel(metadata, t);
+  if (activity.action === 'workspace.created') return t('workspaceSettings.activityWorkspaceCreated');
+  if (activity.action === 'workspace.renamed') return t('workspaceSettings.activityWorkspaceRenamed', { name: String(metadata.to ?? t('workspaceSettings.newNameFallback')) });
+  if (activity.action === 'member.left') return `${t('workspaceSettings.activityMemberLeft')}${cleanup}`;
+  if (activity.action === 'member.removed') return `${t('workspaceSettings.activityMemberRemoved')}${target}${cleanup}`;
+  if (activity.action === 'member.role_updated') return `${t('workspaceSettings.activityRoleUpdated', { role: String(metadata.to ?? 'member') })}${cleanup}`;
+  if (activity.action === 'owner.transferred') return t('workspaceSettings.activityOwnerTransferred', { user: String(metadata.ownerUserId ?? activity.targetId ?? t('workspaceSettings.memberFallback')) });
+  if (activity.action === 'invite.created') return t('workspaceSettings.activityInviteCreated', { role: String(metadata.role ?? 'member') });
   if (activity.action === 'invite.revoked') {
     const role = metadata.role ? `${String(metadata.role)} ` : '';
-    return `Revoked ${role}invite`;
+    return t('workspaceSettings.activityInviteRevoked', { role });
   }
-  if (activity.action === 'invite.accepted') return `Accepted invite as ${String(metadata.role ?? 'member')}`;
+  if (activity.action === 'invite.accepted') return t('workspaceSettings.activityInviteAccepted', { role: String(metadata.role ?? 'member') });
   if (activity.action === 'project.created') {
-    const projectName = String(metadata.projectName ?? activity.targetId ?? 'project');
-    const source = metadata.source ? ` from ${String(metadata.source)}` : '';
-    return `Created ${projectName}${source}`;
+    const projectName = String(metadata.projectName ?? activity.targetId ?? t('workspaceSettings.projectFallback'));
+    return metadata.source
+      ? t('workspaceSettings.activityProjectCreatedFrom', { project: projectName, source: String(metadata.source) })
+      : t('workspaceSettings.activityProjectCreated', { project: projectName });
   }
   if (activity.action === 'project.deleted') {
-    const projectName = String(metadata.projectName ?? activity.targetId ?? 'project');
-    return `Deleted ${projectName}`;
+    const projectName = String(metadata.projectName ?? activity.targetId ?? t('workspaceSettings.projectFallback'));
+    return t('workspaceSettings.activityProjectDeleted', { project: projectName });
   }
   if (activity.action === 'project.imported') {
-    const projectName = String(metadata.projectName ?? activity.targetId ?? 'project');
-    const source = metadata.source ? ` from ${String(metadata.source)}` : '';
-    return `Imported ${projectName}${source}`;
+    const projectName = String(metadata.projectName ?? activity.targetId ?? t('workspaceSettings.projectFallback'));
+    return metadata.source
+      ? t('workspaceSettings.activityProjectImportedFrom', { project: projectName, source: String(metadata.source) })
+      : t('workspaceSettings.activityProjectImported', { project: projectName });
   }
   if (activity.action === 'project.moved') {
-    const projectName = String(metadata.projectName ?? 'project');
+    const projectName = String(metadata.projectName ?? t('workspaceSettings.projectFallback'));
     const movedDeploymentCount = Number(metadata.movedDeploymentCount);
     const movedShareCount = Number(metadata.movedShareCount);
     const movedResources = [];
     if (Number.isFinite(movedDeploymentCount) && movedDeploymentCount > 0) {
-      movedResources.push(`${movedDeploymentCount} deployment${movedDeploymentCount === 1 ? '' : 's'}`);
+      movedResources.push(countLabel(movedDeploymentCount, t('workspaceSettings.deploymentSingular'), t('workspaceSettings.deploymentPlural')));
     }
     if (Number.isFinite(movedShareCount) && movedShareCount > 0) {
-      movedResources.push(`${movedShareCount} viewer link${movedShareCount === 1 ? '' : 's'}`);
+      movedResources.push(countLabel(movedShareCount, t('workspaceSettings.viewerLinkSingular'), t('workspaceSettings.viewerLinkPlural')));
     }
-    return `Moved ${projectName}${movedResources.length > 0 ? ` with ${movedResources.join(', ')}` : ''}`;
+    return movedResources.length > 0
+      ? t('workspaceSettings.activityProjectMovedWith', { project: projectName, resources: movedResources.join(', ') })
+      : t('workspaceSettings.activityProjectMoved', { project: projectName });
   }
   if (activity.action === 'project.owner_transferred') {
-    const projectName = String(metadata.projectName ?? activity.targetId ?? 'project');
-    return `Transferred ${projectName} owner to ${String(metadata.toUserId ?? 'member')}`;
+    const projectName = String(metadata.projectName ?? activity.targetId ?? t('workspaceSettings.projectFallback'));
+    return t('workspaceSettings.activityProjectOwnerTransferred', { project: projectName, user: String(metadata.toUserId ?? t('workspaceSettings.memberFallback')) });
   }
-  if (activity.action === 'routine.created') return `Created routine ${String(metadata.routineName ?? activity.targetId ?? '')}`.trim();
-  if (activity.action === 'routine.updated') return `Updated routine ${String(metadata.routineName ?? activity.targetId ?? '')}`.trim();
-  if (activity.action === 'routine.deleted') return `Deleted routine ${String(metadata.routineName ?? activity.targetId ?? '')}`.trim();
-  if (activity.action === 'routine.owner_transferred') return `Transferred routine ${String(metadata.routineName ?? activity.targetId ?? '')} owner to ${String(metadata.toUserId ?? 'member')}`.trim();
-  if (activity.action === 'routine.run_requested') return `Ran routine ${String(metadata.routineName ?? activity.targetId ?? '')}`.trim();
+  if (activity.action === 'routine.created') return t('workspaceSettings.activityRoutineCreated', { routine: String(metadata.routineName ?? activity.targetId ?? '') }).trim();
+  if (activity.action === 'routine.updated') return t('workspaceSettings.activityRoutineUpdated', { routine: String(metadata.routineName ?? activity.targetId ?? '') }).trim();
+  if (activity.action === 'routine.deleted') return t('workspaceSettings.activityRoutineDeleted', { routine: String(metadata.routineName ?? activity.targetId ?? '') }).trim();
+  if (activity.action === 'routine.owner_transferred') return t('workspaceSettings.activityRoutineOwnerTransferred', { routine: String(metadata.routineName ?? activity.targetId ?? ''), user: String(metadata.toUserId ?? t('workspaceSettings.memberFallback')) }).trim();
+  if (activity.action === 'routine.run_requested') return t('workspaceSettings.activityRoutineRun', { routine: String(metadata.routineName ?? activity.targetId ?? '') }).trim();
   if (activity.action === 'share.created') {
-    return `Created viewer link for ${String(metadata.projectName ?? metadata.projectId ?? 'project')}`;
+    return t('workspaceSettings.activityShareCreated', { project: String(metadata.projectName ?? metadata.projectId ?? t('workspaceSettings.projectFallback')) });
   }
   if (activity.action === 'share.revoked') {
     if (metadata.reason === 'project_deleted') {
-      return `Revoked viewer link because ${String(metadata.projectName ?? metadata.projectId ?? 'project')} was deleted`;
+      return t('workspaceSettings.activityShareRevokedProjectDeleted', { project: String(metadata.projectName ?? metadata.projectId ?? t('workspaceSettings.projectFallback')) });
     }
     if (metadata.reason === 'artifact_deleted') {
-      return `Revoked viewer link because ${String(metadata.artifactId ?? 'artifact')} was deleted`;
+      return t('workspaceSettings.activityShareRevokedArtifactDeleted', { artifact: String(metadata.artifactId ?? t('workspaceSettings.artifactFallback')) });
     }
-    return `Revoked viewer link for ${String(metadata.projectName ?? metadata.projectId ?? 'project')}`;
+    return t('workspaceSettings.activityShareRevoked', { project: String(metadata.projectName ?? metadata.projectId ?? t('workspaceSettings.projectFallback')) });
   }
   return activity.action;
 }
 
-function activityCleanupLabel(metadata: Record<string, unknown>) {
+function activityCleanupLabel(metadata: Record<string, unknown>, t: TFn) {
   const revokedInviteCount = Number(metadata.revokedInviteCount);
   const revokedShareCount = Number(metadata.revokedShareCount);
   const ownedRoutineCount = Number(metadata.ownedRoutineCount);
@@ -159,28 +166,30 @@ function activityCleanupLabel(metadata: Record<string, unknown>) {
   const revokedParts = [];
   const transferredParts = [];
   if (Number.isFinite(revokedInviteCount) && revokedInviteCount > 0) {
-    revokedParts.push(`${revokedInviteCount} invite${revokedInviteCount === 1 ? '' : 's'}`);
+    revokedParts.push(countLabel(revokedInviteCount, t('workspaceSettings.inviteSingular'), t('workspaceSettings.invitePlural')));
   }
   if (Number.isFinite(revokedShareCount) && revokedShareCount > 0) {
-    revokedParts.push(`${revokedShareCount} viewer link${revokedShareCount === 1 ? '' : 's'}`);
+    revokedParts.push(countLabel(revokedShareCount, t('workspaceSettings.viewerLinkSingular'), t('workspaceSettings.viewerLinkPlural')));
   }
   if (revokedParts.length > 0) {
-    parts.push(`revoked ${revokedParts.join(', ')}`);
+    parts.push(t('workspaceSettings.cleanupRevoked', { items: revokedParts.join(', ') }));
   }
   if (Number.isFinite(transferredProjectCount) && transferredProjectCount > 0) {
-    transferredParts.push(`${transferredProjectCount} project${transferredProjectCount === 1 ? '' : 's'}`);
+    transferredParts.push(countLabel(transferredProjectCount, t('workspaceSettings.projectSingular'), t('workspaceSettings.projectPlural')));
   }
   if (Number.isFinite(transferredRoutineCount) && transferredRoutineCount > 0) {
-    transferredParts.push(`${transferredRoutineCount} routine${transferredRoutineCount === 1 ? '' : 's'}`);
+    transferredParts.push(countLabel(transferredRoutineCount, t('workspaceSettings.routineSingular'), t('workspaceSettings.routinePlural')));
   }
   if (transferredParts.length > 0) {
-    parts.push(`transferred ${transferredParts.join(', ')}${transferToUserId ? ` to ${transferToUserId}` : ''}`);
+    parts.push(transferToUserId
+      ? t('workspaceSettings.cleanupTransferredTo', { items: transferredParts.join(', '), user: transferToUserId })
+      : t('workspaceSettings.cleanupTransferred', { items: transferredParts.join(', ') }));
   }
   if (transferredParts.length === 0 && Number.isFinite(ownedRoutineCount) && ownedRoutineCount > 0) {
-    parts.push(`${ownedRoutineCount} routine${ownedRoutineCount === 1 ? '' : 's'} still owned`);
+    parts.push(t('workspaceSettings.cleanupStillOwned', { items: countLabel(ownedRoutineCount, t('workspaceSettings.routineSingular'), t('workspaceSettings.routinePlural')) }));
   }
   if (transferredParts.length === 0 && Number.isFinite(ownedProjectCount) && ownedProjectCount > 0) {
-    parts.push(`${ownedProjectCount} project${ownedProjectCount === 1 ? '' : 's'} still owned`);
+    parts.push(t('workspaceSettings.cleanupStillOwned', { items: countLabel(ownedProjectCount, t('workspaceSettings.projectSingular'), t('workspaceSettings.projectPlural')) }));
   }
   return parts.length > 0 ? ` (${parts.join(', ')})` : '';
 }
@@ -195,67 +204,67 @@ function activityTimeLabel(createdAt: number) {
   });
 }
 
-function activityActorLabel(activity: WorkspaceActivity, currentUserId: string | null) {
-  return activity.actorUserId === currentUserId ? 'You' : activity.actorUserId;
+function activityActorLabel(activity: WorkspaceActivity, currentUserId: string | null, t: TFn) {
+  return activity.actorUserId === currentUserId ? t('workspaceSettings.you') : activity.actorUserId;
 }
 
-function inviteMetaLabel(invite: WorkspaceInviteWithStatus) {
+function inviteMetaLabel(invite: WorkspaceInviteWithStatus, t: TFn) {
   const parts = [`${invite.role} · ${invite.status}`];
-  parts.push(`created by ${invite.createdByUserId}`);
-  parts.push(`created ${activityTimeLabel(invite.createdAt)}`);
+  parts.push(t('workspaceSettings.createdBy', { user: invite.createdByUserId }));
+  parts.push(t('workspaceSettings.createdAt', { time: activityTimeLabel(invite.createdAt) }));
   if (invite.expiresAt != null && invite.status !== 'revoked') {
-    parts.push(`expires ${activityTimeLabel(invite.expiresAt)}`);
+    parts.push(t('workspaceSettings.expiresAt', { time: activityTimeLabel(invite.expiresAt) }));
   }
   if (invite.revokedAt != null) {
-    parts.push(`revoked ${activityTimeLabel(invite.revokedAt)}`);
+    parts.push(t('workspaceSettings.revokedAt', { time: activityTimeLabel(invite.revokedAt) }));
   }
   if (invite.acceptedByUserId) {
-    parts.push(`accepted by ${invite.acceptedByUserId}`);
+    parts.push(t('workspaceSettings.acceptedBy', { user: invite.acceptedByUserId }));
   }
   return parts.filter(Boolean).join(' · ');
 }
 
-function shareMetaLabel(share: ResourceShare) {
-  const parts = [`${share.projectName ?? share.projectId} · viewer`];
+function shareMetaLabel(share: ResourceShare, t: TFn) {
+  const parts = [`${share.projectName ?? share.projectId} · ${t('workspaceSettings.viewerRole')}`];
   if (share.artifactId) {
     parts.push(share.artifactId);
   }
-  parts.push(`created by ${share.createdByUserId}`);
-  parts.push(`created ${activityTimeLabel(share.createdAt)}`);
+  parts.push(t('workspaceSettings.createdBy', { user: share.createdByUserId }));
+  parts.push(t('workspaceSettings.createdAt', { time: activityTimeLabel(share.createdAt) }));
   if (share.revokedAt != null) {
-    parts.push(`revoked ${activityTimeLabel(share.revokedAt)}`);
+    parts.push(t('workspaceSettings.revokedAt', { time: activityTimeLabel(share.revokedAt) }));
   }
   return parts.filter(Boolean).join(' · ');
 }
 
-function inviteTitle(invite: WorkspaceInviteWithStatus) {
-  if (invite.status === 'pending') return invite.inviteUrl ?? 'Invite link';
-  if (invite.status === 'accepted') return 'Invite accepted';
-  if (invite.status === 'revoked') return 'Invite revoked';
-  if (invite.status === 'expired') return 'Invite expired';
-  return 'Invite link';
+function inviteTitle(invite: WorkspaceInviteWithStatus, t: TFn) {
+  if (invite.status === 'pending') return invite.inviteUrl ?? t('workspaceSettings.inviteLink');
+  if (invite.status === 'accepted') return t('workspaceSettings.inviteAccepted');
+  if (invite.status === 'revoked') return t('workspaceSettings.inviteRevoked');
+  if (invite.status === 'expired') return t('workspaceSettings.inviteExpired');
+  return t('workspaceSettings.inviteLink');
 }
 
-function memberTitle(member: WorkspaceMembership, currentUserId: string | null) {
-  return member.userId === currentUserId ? 'You' : member.userId;
+function memberTitle(member: WorkspaceMembership, currentUserId: string | null, t: TFn) {
+  return member.userId === currentUserId ? t('workspaceSettings.you') : member.userId;
 }
 
-function memberSubtitle(member: WorkspaceMembership, currentUserId: string | null) {
-  const parts = [member.userId === currentUserId ? member.userId : roleLabel(member.role)];
+function memberSubtitle(member: WorkspaceMembership, currentUserId: string | null, t: TFn) {
+  const parts = [member.userId === currentUserId ? member.userId : roleLabel(member.role, t)];
   const ownedProjectCount = Number(member.ownedProjectCount);
   const ownedRoutineCount = Number(member.ownedRoutineCount);
   const assetParts = [];
   if (Number.isFinite(ownedProjectCount) && ownedProjectCount > 0) {
-    assetParts.push(`${ownedProjectCount} project${ownedProjectCount === 1 ? '' : 's'}`);
+    assetParts.push(countLabel(ownedProjectCount, t('workspaceSettings.projectSingular'), t('workspaceSettings.projectPlural')));
   }
   if (Number.isFinite(ownedRoutineCount) && ownedRoutineCount > 0) {
-    assetParts.push(`${ownedRoutineCount} routine${ownedRoutineCount === 1 ? '' : 's'}`);
+    assetParts.push(countLabel(ownedRoutineCount, t('workspaceSettings.routineSingular'), t('workspaceSettings.routinePlural')));
   }
   if (assetParts.length > 0) {
-    parts.push(`owns ${assetParts.join(', ')}`);
+    parts.push(t('workspaceSettings.ownsAssets', { items: assetParts.join(', ') }));
   }
   if (member.joinedAt) {
-    parts.push(`joined ${activityTimeLabel(member.joinedAt)}`);
+    parts.push(t('workspaceSettings.joinedAt', { time: activityTimeLabel(member.joinedAt) }));
   }
   return parts.join(' · ');
 }
@@ -269,86 +278,85 @@ function countLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function joinImpactParts(parts: string[]) {
+function joinImpactParts(parts: string[], t: TFn) {
   if (parts.length === 0) return '';
   if (parts.length === 1) return parts[0] ?? '';
-  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return t('workspaceSettings.joinList', { head: parts.slice(0, -1).join(', '), tail: parts[parts.length - 1] ?? '' });
 }
 
-function leaveWorkspaceImpactLabel(member: WorkspaceMembership | undefined, ownerUserId: string | undefined) {
+function leaveWorkspaceImpactLabel(member: WorkspaceMembership | undefined, ownerUserId: string | undefined, t: TFn) {
   const ownedProjectCount = Number(member?.ownedProjectCount);
   const ownedRoutineCount = Number(member?.ownedRoutineCount);
   const parts = [];
   if (Number.isFinite(ownedProjectCount) && ownedProjectCount > 0) {
-    parts.push(countLabel(ownedProjectCount, 'project'));
+    parts.push(countLabel(ownedProjectCount, t('workspaceSettings.projectSingular'), t('workspaceSettings.projectPlural')));
   }
   if (Number.isFinite(ownedRoutineCount) && ownedRoutineCount > 0) {
-    parts.push(countLabel(ownedRoutineCount, 'routine'));
+    parts.push(countLabel(ownedRoutineCount, t('workspaceSettings.routineSingular'), t('workspaceSettings.routinePlural')));
   }
-  if (parts.length === 0) return 'You will lose access until someone invites you again.';
-  const recipient = ownerUserId ? ` to ${ownerUserId}` : '';
-  return `You will lose access, and your ${joinImpactParts(parts)} will transfer${recipient}. Pending invites and viewer links you created will be revoked.`;
+  if (parts.length === 0) return t('workspaceSettings.leaveImpactNoAssets');
+  return ownerUserId
+    ? t('workspaceSettings.leaveImpactWithRecipient', { items: joinImpactParts(parts, t), user: ownerUserId })
+    : t('workspaceSettings.leaveImpact', { items: joinImpactParts(parts, t) });
 }
 
-function removeMemberImpactLabel(member: WorkspaceMembership, transferToUserId: string) {
+function removeMemberImpactLabel(member: WorkspaceMembership, transferToUserId: string, t: TFn) {
   const ownedProjectCount = Number(member.ownedProjectCount);
   const ownedRoutineCount = Number(member.ownedRoutineCount);
   const parts = [];
   if (Number.isFinite(ownedProjectCount) && ownedProjectCount > 0) {
-    parts.push(countLabel(ownedProjectCount, 'project'));
+    parts.push(countLabel(ownedProjectCount, t('workspaceSettings.projectSingular'), t('workspaceSettings.projectPlural')));
   }
   if (Number.isFinite(ownedRoutineCount) && ownedRoutineCount > 0) {
-    parts.push(countLabel(ownedRoutineCount, 'routine'));
+    parts.push(countLabel(ownedRoutineCount, t('workspaceSettings.routineSingular'), t('workspaceSettings.routinePlural')));
   }
-  const accessLoss = 'They will lose access.';
-  const cleanup = 'Pending invites and viewer links they created will be revoked.';
-  if (parts.length === 0) return `${accessLoss} ${cleanup}`;
-  return `${accessLoss} Their ${joinImpactParts(parts)} will transfer to ${transferToUserId}. ${cleanup}`;
+  if (parts.length === 0) return t('workspaceSettings.removeMemberImpactNoAssets');
+  return t('workspaceSettings.removeMemberImpact', { items: joinImpactParts(parts, t), user: transferToUserId });
 }
 
-function memberRoleChangeImpactLabel(member: WorkspaceMembership, role: 'admin' | 'member') {
+function memberRoleChangeImpactLabel(member: WorkspaceMembership, role: 'admin' | 'member', t: TFn) {
   if (role === 'admin') {
-    return `${member.userId} will be able to manage members, invites, viewer links, and project ownership in this workspace.`;
+    return t('workspaceSettings.roleChangeToAdminImpact', { user: member.userId });
   }
-  return `${member.userId} will lose workspace management access. Pending invites and viewer links they created will be revoked.`;
+  return t('workspaceSettings.roleChangeToMemberImpact', { user: member.userId });
 }
 
-function adminInviteImpactLabel(workspaceName: string, expiresInDays: number) {
-  const expiry = Number.isFinite(expiresInDays) && expiresInDays > 0
-    ? ` for ${expiresInDays} day${expiresInDays === 1 ? '' : 's'}`
-    : '';
-  return `Anyone with this link can join ${workspaceName} as an admin${expiry}. They will be able to manage members, invites, viewer links, project moves, and project ownership.`;
+function adminInviteImpactLabel(workspaceName: string, expiresInDays: number, t: TFn) {
+  return Number.isFinite(expiresInDays) && expiresInDays > 0
+    ? t('workspaceSettings.adminInviteImpactWithExpiry', { workspace: workspaceName, days: expiresInDays })
+    : t('workspaceSettings.adminInviteImpact', { workspace: workspaceName });
 }
 
-function transferWorkspaceOwnerImpactLabel(workspaceName: string, ownerUserId: string) {
-  return `${ownerUserId} will become the only owner of ${workspaceName}. You will become an admin and lose owner-only actions like deleting the workspace or transferring ownership again.`;
+function transferWorkspaceOwnerImpactLabel(workspaceName: string, ownerUserId: string, t: TFn) {
+  return t('workspaceSettings.transferWorkspaceOwnerImpact', { user: ownerUserId, workspace: workspaceName });
 }
 
-function moveProjectImpactLabel(projectName: string, targetWorkspaceName: string) {
-  return `${projectName} will move to ${targetWorkspaceName}. Existing deployments and viewer links stay attached to the project and move with it.`;
+function moveProjectImpactLabel(projectName: string, targetWorkspaceName: string, t: TFn) {
+  return t('workspaceSettings.moveProjectImpact', { project: projectName, workspace: targetWorkspaceName });
 }
 
-function transferProjectOwnerImpactLabel(projectName: string, ownerUserId: string) {
-  return `${projectName} will stay in this workspace, but ${ownerUserId} will become responsible for it.`;
+function transferProjectOwnerImpactLabel(projectName: string, ownerUserId: string, t: TFn) {
+  return t('workspaceSettings.transferProjectOwnerImpact', { project: projectName, user: ownerUserId });
 }
 
-function revokeInviteImpactLabel(invite: WorkspaceInviteWithStatus) {
-  return `This ${invite.role} invite link will stop letting new people join. Existing workspace members are not affected.`;
+function revokeInviteImpactLabel(invite: WorkspaceInviteWithStatus, t: TFn) {
+  return t('workspaceSettings.revokeInviteImpact', { role: invite.role });
 }
 
-function revokeViewerLinkImpactLabel(share: ResourceShare) {
+function revokeViewerLinkImpactLabel(share: ResourceShare, t: TFn) {
   const target = share.projectName ?? share.projectId;
-  const artifact = share.artifactId ? ` for ${share.artifactId}` : '';
-  return `External viewers will lose access to ${target}${artifact}. The artifact itself stays in the workspace.`;
+  return share.artifactId
+    ? t('workspaceSettings.revokeViewerLinkImpactWithArtifact', { target, artifact: share.artifactId })
+    : t('workspaceSettings.revokeViewerLinkImpact', { target });
 }
 
-function deleteWorkspaceImpactLabel(input: { memberCount: number; pendingInviteCount: number; shareCount: number }) {
+function deleteWorkspaceImpactLabel(input: { memberCount: number; pendingInviteCount: number; shareCount: number }, t: TFn) {
   const parts = [];
-  if (input.memberCount > 0) parts.push(countLabel(input.memberCount, 'member record'));
-  if (input.pendingInviteCount > 0) parts.push(countLabel(input.pendingInviteCount, 'pending invite'));
-  if (input.shareCount > 0) parts.push(countLabel(input.shareCount, 'viewer link'));
-  parts.push('activity history');
-  return `Deleting this workspace removes ${joinImpactParts(parts)}. It can only proceed after projects and automations are gone.`;
+  if (input.memberCount > 0) parts.push(countLabel(input.memberCount, t('workspaceSettings.memberRecordSingular'), t('workspaceSettings.memberRecordPlural')));
+  if (input.pendingInviteCount > 0) parts.push(countLabel(input.pendingInviteCount, t('workspaceSettings.pendingInviteSingular'), t('workspaceSettings.pendingInvitePlural')));
+  if (input.shareCount > 0) parts.push(countLabel(input.shareCount, t('workspaceSettings.viewerLinkSingular'), t('workspaceSettings.viewerLinkPlural')));
+  parts.push(t('workspaceSettings.activityHistory'));
+  return t('workspaceSettings.deleteWorkspaceImpact', { items: joinImpactParts(parts, t) });
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -373,6 +381,7 @@ export function WorkspaceSettingsView({
   onProjectsChanged,
   onCreateWorkspaceInvite,
 }: Props) {
+  const t = useT();
   const [members, setMembers] = useState<WorkspaceMembership[]>([]);
   const [invites, setInvites] = useState<WorkspaceInviteWithStatus[]>([]);
   const [shares, setShares] = useState<ResourceShare[]>([]);
@@ -429,13 +438,13 @@ export function WorkspaceSettingsView({
     memberCount: members.length,
     pendingInviteCount,
     shareCount: shares.length,
-  });
+  }, t);
   const statusItems = [
-    { label: 'Members', value: String(members.length) },
-    { label: 'Projects', value: String(projects.length) },
-    { label: 'Automations', value: String(routines.length) },
-    { label: 'Pending invites', value: String(pendingInviteCount) },
-    { label: 'Viewer links', value: String(shares.length) },
+    { label: t('workspaceSettings.statusMembers'), value: String(members.length) },
+    { label: t('workspaceSettings.statusProjects'), value: String(projects.length) },
+    { label: t('workspaceSettings.statusAutomations'), value: String(routines.length) },
+    { label: t('workspaceSettings.statusPendingInvites'), value: String(pendingInviteCount) },
+    { label: t('workspaceSettings.statusViewerLinks'), value: String(shares.length) },
   ];
 
   const refreshWorkspaceDetails = useCallback(async (workspaceId = currentWorkspaceId) => {
@@ -457,7 +466,7 @@ export function WorkspaceSettingsView({
     if (workspaceId !== currentWorkspaceIdRef.current || refreshSerial !== refreshSerialRef.current) return;
     const detailError = [membersResult, activitiesResult, routinesResult].find((result) => !result.ok);
     if (detailError && !detailError.ok) {
-      setLoadError(`Could not load workspace details. ${detailError.error}`);
+      setLoadError(t('workspaceSettings.detailsLoadError', { error: detailError.error }));
       setLoading(false);
       return;
     }
@@ -475,7 +484,7 @@ export function WorkspaceSettingsView({
       const sharesResult = await listWorkspaceSharesResult(workspaceId);
       if (workspaceId !== currentWorkspaceIdRef.current || refreshSerial !== refreshSerialRef.current) return;
       if (!sharesResult.ok) {
-        setLoadError(`Could not load viewer links. ${sharesResult.error}`);
+        setLoadError(t('workspaceSettings.viewerLinksLoadError', { error: sharesResult.error }));
         setLoading(false);
         return;
       }
@@ -485,7 +494,7 @@ export function WorkspaceSettingsView({
       const invitesResult = await listWorkspaceInvitesResult(workspaceId);
       if (workspaceId !== currentWorkspaceIdRef.current || refreshSerial !== refreshSerialRef.current) return;
       if (!invitesResult.ok) {
-        setLoadError(`Could not load workspace invites. ${invitesResult.error}`);
+        setLoadError(t('workspaceSettings.invitesLoadError', { error: invitesResult.error }));
         setLoading(false);
         return;
       }
@@ -498,7 +507,7 @@ export function WorkspaceSettingsView({
     setRoutines(nextRoutines);
     setActivities(nextActivities);
     setLoading(false);
-  }, [currentUserId, currentWorkspaceId, workspaces]);
+  }, [currentUserId, currentWorkspaceId, t, workspaces]);
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
@@ -541,7 +550,7 @@ export function WorkspaceSettingsView({
       }
       setNewWorkspaceName('');
       await onWorkspaceCreated(result.value);
-      setNotice(`Created ${result.value.name}.`);
+      setNotice(t('workspaceSettings.workspaceCreatedNotice', { name: result.value.name }));
       await refreshWorkspaceDetails(result.value.id);
     } finally {
       setCreatingWorkspace(false);
@@ -564,7 +573,7 @@ export function WorkspaceSettingsView({
       }
       await onWorkspaceUpdated(result.value);
       if (currentWorkspaceIdRef.current !== workspaceId) return;
-      setNotice('Workspace renamed.');
+      setNotice(t('workspaceSettings.workspaceRenamedNotice'));
       await refreshWorkspaceDetails(result.value.id);
     } finally {
       setRenamingWorkspaceId((current) => (current === workspaceId ? null : current));
@@ -575,8 +584,8 @@ export function WorkspaceSettingsView({
     if (!currentWorkspace || leavingWorkspace) return;
     const workspace = currentWorkspace;
     const workspaceId = workspace.id;
-    const impact = leaveWorkspaceImpactLabel(currentMembership, ownerMember?.userId);
-    if (!window.confirm(`Leave ${workspace.name}? ${impact}`)) {
+    const impact = leaveWorkspaceImpactLabel(currentMembership, ownerMember?.userId, t);
+    if (!window.confirm(t('workspaceSettings.leaveConfirm', { name: workspace.name, impact }))) {
       return;
     }
     setLeavingWorkspaceId(workspaceId);
@@ -590,7 +599,7 @@ export function WorkspaceSettingsView({
       }
       await onWorkspaceRemoved(workspaceId);
       if (currentWorkspaceIdRef.current === workspaceId) {
-        setNotice(`Left ${workspace.name}.`);
+        setNotice(t('workspaceSettings.leftNotice', { name: workspace.name }));
       }
     } finally {
       setLeavingWorkspaceId((current) => (current === workspaceId ? null : current));
@@ -601,7 +610,7 @@ export function WorkspaceSettingsView({
     if (!currentWorkspace || deletingWorkspace) return;
     const workspace = currentWorkspace;
     const workspaceId = workspace.id;
-    if (!window.confirm(`Delete ${workspace.name}? ${deleteWorkspaceImpact}`)) {
+    if (!window.confirm(t('workspaceSettings.deleteConfirm', { name: workspace.name, impact: deleteWorkspaceImpact }))) {
       return;
     }
     setDeletingWorkspaceId(workspaceId);
@@ -615,7 +624,7 @@ export function WorkspaceSettingsView({
       }
       await onWorkspaceRemoved(workspaceId);
       if (currentWorkspaceIdRef.current === workspaceId) {
-        setNotice(`Deleted ${workspace.name}.`);
+        setNotice(t('workspaceSettings.deletedNotice', { name: workspace.name }));
       }
     } finally {
       setDeletingWorkspaceId((current) => (current === workspaceId ? null : current));
@@ -625,11 +634,11 @@ export function WorkspaceSettingsView({
   async function handleInvite() {
     if (!currentWorkspace || creatingInvite) return;
     if (!isTeamWorkspace) {
-      setNotice('Create or switch to a team workspace to invite members.');
+      setNotice(t('workspaceNav.inviteTeamRequired'));
       return;
     }
     const workspaceId = currentWorkspace.id;
-    if (inviteRole === 'admin' && !window.confirm(`Create admin invite? ${adminInviteImpactLabel(currentWorkspace.name, inviteExpiresInDays)}`)) {
+    if (inviteRole === 'admin' && !window.confirm(t('workspaceSettings.adminInviteConfirm', { impact: adminInviteImpactLabel(currentWorkspace.name, inviteExpiresInDays, t) }))) {
       return;
     }
     setCreatingInviteWorkspaceId(workspaceId);
@@ -647,11 +656,11 @@ export function WorkspaceSettingsView({
       if (currentWorkspaceIdRef.current !== workspaceId) return;
       const invite = result.value;
       if (!invite.inviteUrl) {
-        setNotice('Could not create invite link.');
+        setNotice(t('workspaceSettings.inviteCreateFailed'));
         return;
       }
       const copied = await copyText(invite.inviteUrl);
-      setNotice(copied ? 'Invite link copied.' : invite.inviteUrl);
+      setNotice(copied ? t('workspaceSettings.inviteCopied') : invite.inviteUrl);
       await refreshWorkspaceDetails(workspaceId);
     } finally {
       setCreatingInviteWorkspaceId((current) => (current === workspaceId ? null : current));
@@ -662,7 +671,7 @@ export function WorkspaceSettingsView({
     if (updatingMemberIds.has(member.userId)) return;
     if (role === member.role) return;
     const workspaceId = member.workspaceId;
-    if (!window.confirm(`Change ${member.userId} to ${roleLabel(role)}? ${memberRoleChangeImpactLabel(member, role)}`)) {
+    if (!window.confirm(t('workspaceSettings.roleChangeConfirm', { user: member.userId, role: roleLabel(role, t), impact: memberRoleChangeImpactLabel(member, role, t) }))) {
       return;
     }
     setUpdatingMemberIds((current) => new Set(current).add(member.userId));
@@ -690,7 +699,7 @@ export function WorkspaceSettingsView({
 
   async function handleTransferOwner() {
     if (!currentWorkspace || !ownerTargetUserId || transferringOwner) return;
-    if (!window.confirm(`Transfer ownership? ${transferWorkspaceOwnerImpactLabel(currentWorkspace.name, ownerTargetUserId)}`)) {
+    if (!window.confirm(t('workspaceSettings.transferOwnershipConfirm', { impact: transferWorkspaceOwnerImpactLabel(currentWorkspace.name, ownerTargetUserId, t) }))) {
       return;
     }
     const workspace = currentWorkspace;
@@ -721,7 +730,7 @@ export function WorkspaceSettingsView({
         if (member.userId === result.value.owner.userId) return result.value.owner;
         return member;
       }));
-      setNotice('Workspace ownership transferred.');
+      setNotice(t('workspaceSettings.ownershipTransferredNotice'));
       await refreshWorkspaceDetails(workspaceId);
     } finally {
       setTransferringOwnerWorkspaceId((current) => (current === workspaceId ? null : current));
@@ -737,11 +746,11 @@ export function WorkspaceSettingsView({
       ?? members.find((item) => item.userId !== member.userId)?.userId
       ?? '';
     if (!transferToUserId) {
-      setNotice("Choose a workspace member to receive this member's projects and routines.");
+      setNotice(t('workspaceSettings.chooseTransferTargetNotice'));
       return;
     }
-    const workspaceName = currentWorkspace?.name ?? 'this workspace';
-    if (!window.confirm(`Remove ${member.userId} from ${workspaceName}? ${removeMemberImpactLabel(member, transferToUserId)}`)) {
+    const workspaceName = currentWorkspace?.name ?? t('workspaceSettings.thisWorkspace');
+    if (!window.confirm(t('workspaceSettings.removeMemberConfirm', { user: member.userId, workspace: workspaceName, impact: removeMemberImpactLabel(member, transferToUserId, t) }))) {
       return;
     }
     setRemovingMemberIds((current) => new Set(current).add(member.userId));
@@ -767,7 +776,7 @@ export function WorkspaceSettingsView({
 
   async function handleRevokeInvite(invite: WorkspaceInviteWithStatus) {
     if (revokingInviteIds.has(invite.id)) return;
-    if (!window.confirm(`Revoke invite link? ${revokeInviteImpactLabel(invite)}`)) {
+    if (!window.confirm(t('workspaceSettings.revokeInviteConfirm', { impact: revokeInviteImpactLabel(invite, t) }))) {
       return;
     }
     setRevokingInviteIds((current) => new Set(current).add(invite.id));
@@ -791,20 +800,20 @@ export function WorkspaceSettingsView({
 
   async function handleCopyInvite(invite: WorkspaceInviteWithStatus) {
     if (invite.status !== 'pending') {
-      setNotice('Only pending invite links can be copied.');
+      setNotice(t('workspaceSettings.onlyPendingInviteCopy'));
       return;
     }
     const workspaceId = currentWorkspaceId;
     const link = invite.inviteUrl ?? '';
     const copied = await copyText(link);
     if (currentWorkspaceIdRef.current !== workspaceId) return;
-    setNotice(copied ? 'Invite link copied.' : link || 'No invite link available.');
+    setNotice(copied ? t('workspaceSettings.inviteCopied') : link || t('workspaceSettings.noInviteLink'));
   }
 
   async function handleRevokeShare(share: ResourceShare) {
     if (revokingShareIds.has(share.id)) return;
     const workspaceId = currentWorkspaceId;
-    if (!window.confirm(`Revoke viewer link? ${revokeViewerLinkImpactLabel(share)}`)) {
+    if (!window.confirm(t('workspaceSettings.revokeViewerLinkConfirm', { impact: revokeViewerLinkImpactLabel(share, t) }))) {
       return;
     }
     setRevokingShareIds((current) => new Set(current).add(share.id));
@@ -816,7 +825,7 @@ export function WorkspaceSettingsView({
         return;
       }
       setShares((current) => current.filter((item) => item.id !== share.id));
-      setNotice('Viewer link revoked.');
+      setNotice(t('workspaceSettings.viewerLinkRevokedNotice'));
       await refreshWorkspaceDetails(workspaceId);
     } finally {
       setRevokingShareIds((current) => {
@@ -832,7 +841,7 @@ export function WorkspaceSettingsView({
     const link = share.shareUrl ?? '';
     const copied = await copyText(link);
     if (currentWorkspaceIdRef.current !== workspaceId) return;
-    setNotice(copied ? 'Viewer link copied.' : link || 'No viewer link available.');
+    setNotice(copied ? t('workspaceSettings.viewerLinkCopied') : link || t('workspaceSettings.noViewerLink'));
   }
 
   async function handleMoveProject(project: Project) {
@@ -841,7 +850,7 @@ export function WorkspaceSettingsView({
     const targetWorkspaceId = projectMoveTargets[project.id] ?? '';
     if (!targetWorkspaceId || targetWorkspaceId === project.workspaceId) return;
     const targetWorkspaceName = workspaces.find((workspace) => workspace.id === targetWorkspaceId)?.name ?? targetWorkspaceId;
-    if (!window.confirm(`Move ${project.name}? ${moveProjectImpactLabel(project.name, targetWorkspaceName)}`)) {
+    if (!window.confirm(t('workspaceSettings.moveProjectConfirm', { project: project.name, impact: moveProjectImpactLabel(project.name, targetWorkspaceName, t) }))) {
       return;
     }
     setMovingProjectIds((current) => new Set(current).add(project.id));
@@ -860,7 +869,7 @@ export function WorkspaceSettingsView({
         delete next[project.id];
         return next;
       });
-      setNotice(`Moved ${project.name}.`);
+      setNotice(t('workspaceSettings.projectMovedNotice', { project: project.name }));
       await refreshWorkspaceDetails(workspaceId);
     } finally {
       if (currentWorkspaceIdRef.current === workspaceId) {
@@ -878,7 +887,7 @@ export function WorkspaceSettingsView({
     const workspaceId = currentWorkspaceId;
     const ownedByUserId = projectOwnerTargets[project.id] ?? '';
     if (!ownedByUserId || ownedByUserId === project.ownedByUserId) return;
-    if (!window.confirm(`Transfer ${project.name} owner? ${transferProjectOwnerImpactLabel(project.name, ownedByUserId)}`)) {
+    if (!window.confirm(t('workspaceSettings.transferProjectOwnerConfirm', { project: project.name, impact: transferProjectOwnerImpactLabel(project.name, ownedByUserId, t) }))) {
       return;
     }
     setTransferringProjectOwnerIds((current) => new Set(current).add(project.id));
@@ -897,7 +906,7 @@ export function WorkspaceSettingsView({
         delete next[project.id];
         return next;
       });
-      setNotice(`Transferred ${project.name} owner.`);
+      setNotice(t('workspaceSettings.projectOwnerTransferredNotice', { project: project.name }));
       await refreshWorkspaceDetails(workspaceId);
     } finally {
       if (currentWorkspaceIdRef.current === workspaceId) {
@@ -916,7 +925,7 @@ export function WorkspaceSettingsView({
     try {
       await onWorkspaceChange(workspaceId);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Could not switch workspace.');
+      setNotice(error instanceof Error ? error.message : t('workspaceNav.switchFailed'));
     }
   }
 
@@ -924,8 +933,8 @@ export function WorkspaceSettingsView({
     <div className="workspace-settings">
       <header className="workspace-settings__header">
         <div>
-          <p className="workspace-settings__eyebrow">Workspace</p>
-          <h1>{currentWorkspace?.name ?? 'Workspace'}</h1>
+          <p className="workspace-settings__eyebrow">{t('workspaceNav.title')}</p>
+          <h1>{currentWorkspace?.name ?? t('workspaceNav.title')}</h1>
         </div>
         <select
           className="workspace-settings__select"
@@ -938,25 +947,25 @@ export function WorkspaceSettingsView({
         </select>
       </header>
 
-      <section className="workspace-settings__summary" aria-label="Workspace access">
-        <span className="workspace-settings__pill">{accessLabel(currentWorkspaceRole)}</span>
-        <p>{capabilitySummary(currentWorkspaceRole, Boolean(isTeamWorkspace))}</p>
+      <section className="workspace-settings__summary" aria-label={t('workspaceSettings.accessAria')}>
+        <span className="workspace-settings__pill">{accessLabel(currentWorkspaceRole, t)}</span>
+        <p>{capabilitySummary(currentWorkspaceRole, Boolean(isTeamWorkspace), t)}</p>
       </section>
 
       {loadError ? (
-        <section className="workspace-settings__load-error" aria-label="Workspace load status">
+        <section className="workspace-settings__load-error" aria-label={t('workspaceSettings.loadStatusAria')}>
           <div>
-            <strong>Workspace details unavailable</strong>
+            <strong>{t('workspaceSettings.detailsUnavailable')}</strong>
             <p>{loadError}</p>
           </div>
           <button type="button" onClick={() => void refreshWorkspaceDetails(currentWorkspaceId)}>
             <Icon name="refresh" size={13} />
-            Retry
+            {t('workspaceSettings.retry')}
           </button>
         </section>
       ) : null}
 
-      <section className="workspace-settings__status" aria-label="Workspace status">
+      <section className="workspace-settings__status" aria-label={t('workspaceSettings.statusAria')}>
         {statusItems.map((item) => (
           <div className="workspace-settings__status-item" key={item.label}>
             <strong>{item.value}</strong>
@@ -964,22 +973,22 @@ export function WorkspaceSettingsView({
           </div>
         ))}
         <div className="workspace-settings__status-item workspace-settings__status-item--wide">
-          <strong>{ownerMember?.userId ?? 'No owner loaded'}</strong>
-          <span>Owner</span>
+          <strong>{ownerMember?.userId ?? t('workspaceSettings.noOwnerLoaded')}</strong>
+          <span>{t('workspaceSettings.roleOwner')}</span>
         </div>
       </section>
 
       <section className="workspace-settings__section">
         <div>
-          <h2>Workspace details</h2>
+          <h2>{t('workspaceSettings.detailsTitle')}</h2>
           <p>
             {isTeamWorkspace
-              ? 'Rename the team workspace that projects and invites belong to.'
-              : 'Your personal workspace stays available without account setup.'}
+              ? t('workspaceSettings.detailsTeamBody')
+              : t('workspaceSettings.detailsPersonalBody')}
           </p>
           {!isTeamWorkspace ? (
-            <p className="workspace-settings__hint">Personal workspace names stay fixed.</p>
-          ) : managerOnlyHint(canManage)}
+            <p className="workspace-settings__hint">{t('workspaceSettings.personalNameFixed')}</p>
+          ) : managerOnlyHint(canManage, t)}
         </div>
         <div className="workspace-settings__inline-form">
           <input
@@ -988,7 +997,7 @@ export function WorkspaceSettingsView({
             onKeyDown={(event) => {
               if (event.key === 'Enter') void handleRenameWorkspace();
             }}
-            placeholder="Workspace name"
+            placeholder={t('workspaceSettings.workspaceNamePlaceholder')}
             disabled={!canManage || !isTeamWorkspace}
           />
           <button
@@ -997,15 +1006,15 @@ export function WorkspaceSettingsView({
             disabled={!canManage || !isTeamWorkspace || renamingWorkspace || workspaceName.trim() === currentWorkspace?.name}
           >
             <Icon name="check" size={13} />
-            {renamingWorkspace ? 'Saving...' : 'Save'}
+            {renamingWorkspace ? t('workspaceSettings.saving') : t('common.save')}
           </button>
         </div>
       </section>
 
       <section className="workspace-settings__section">
         <div>
-          <h2>Create workspace</h2>
-          <p>Start another team workspace without forcing account registration.</p>
+          <h2>{t('workspaceSettings.createTitle')}</h2>
+          <p>{t('workspaceSettings.createBody')}</p>
         </div>
         <div className="workspace-settings__inline-form">
           <input
@@ -1014,7 +1023,7 @@ export function WorkspaceSettingsView({
             onKeyDown={(event) => {
               if (event.key === 'Enter') void handleCreateWorkspace();
             }}
-            placeholder="Workspace name"
+            placeholder={t('workspaceSettings.workspaceNamePlaceholder')}
           />
           <button
             type="button"
@@ -1022,7 +1031,7 @@ export function WorkspaceSettingsView({
             disabled={creatingWorkspace || !newWorkspaceName.trim()}
           >
             <Icon name="plus" size={13} />
-            {creatingWorkspace ? 'Creating...' : 'Create'}
+            {creatingWorkspace ? t('workspaceSettings.creating') : t('common.create')}
           </button>
         </div>
       </section>
@@ -1030,15 +1039,15 @@ export function WorkspaceSettingsView({
       <section className="workspace-settings__section">
         <div className="workspace-settings__section-head">
           <div>
-            <h2>Members</h2>
-            <p>Members can open projects in this workspace. Admins can invite and manage members.</p>
+            <h2>{t('workspaceSettings.membersTitle')}</h2>
+            <p>{t('workspaceSettings.membersBody')}</p>
             {!isTeamWorkspace ? (
-              <p className="workspace-settings__hint">Create or switch to a team workspace to invite members.</p>
-            ) : managerOnlyHint(canManage)}
+              <p className="workspace-settings__hint">{t('workspaceNav.inviteTeamRequired')}</p>
+            ) : managerOnlyHint(canManage, t)}
           </div>
         </div>
         {loading ? (
-          <div className="workspace-settings__empty">Loading members...</div>
+          <div className="workspace-settings__empty">{t('workspaceSettings.loadingMembers')}</div>
         ) : (
           <div className="workspace-settings__list">
             {members.map((member) => (
@@ -1048,14 +1057,14 @@ export function WorkspaceSettingsView({
                     {memberInitial(member, currentUserId)}
                   </span>
                   <div className="workspace-settings__identity">
-                    <strong>{memberTitle(member, currentUserId)}</strong>
-                    <span>{memberSubtitle(member, currentUserId)}</span>
+                    <strong>{memberTitle(member, currentUserId, t)}</strong>
+                    <span>{memberSubtitle(member, currentUserId, t)}</span>
                   </div>
                 </div>
                 {member.role === 'owner' ? (
                   <div className="workspace-settings__actions">
-                    <span className="workspace-settings__pill">Owner</span>
-                    <span className="workspace-settings__action-note">Transfer ownership to change this role.</span>
+                    <span className="workspace-settings__pill">{t('workspaceSettings.roleOwner')}</span>
+                    <span className="workspace-settings__action-note">{t('workspaceSettings.ownerRoleLocked')}</span>
                   </div>
                 ) : (
                   <div className="workspace-settings__actions">
@@ -1076,11 +1085,11 @@ export function WorkspaceSettingsView({
                       disabled={!canManage || member.userId === currentUserId || busy}
                       onChange={(event) => void handleRoleChange(member, event.target.value as 'admin' | 'member')}
                     >
-                      <option value="member">Member</option>
-                      <option value="admin">Admin</option>
+                      <option value="member">{t('workspaceSettings.roleMember')}</option>
+                      <option value="admin">{t('workspaceSettings.roleAdmin')}</option>
                     </select>
                     <select
-                      aria-label={`Transfer assets for ${memberTitle(member, currentUserId)}`}
+                      aria-label={t('workspaceSettings.transferAssetsAria', { member: memberTitle(member, currentUserId, t) })}
                       value={assetTransferTarget}
                       disabled={!canManage || member.userId === currentUserId || busy || assetTransferMembers.length === 0}
                       onChange={(event) => setMemberAssetTransferTargets((current) => ({
@@ -1090,7 +1099,7 @@ export function WorkspaceSettingsView({
                     >
                       {assetTransferMembers.map((targetMember) => (
                         <option key={targetMember.userId} value={targetMember.userId}>
-                          Assets to {memberTitle(targetMember, currentUserId)}
+                          {t('workspaceSettings.assetsToMember', { member: memberTitle(targetMember, currentUserId, t) })}
                         </option>
                       ))}
                     </select>
@@ -1100,13 +1109,13 @@ export function WorkspaceSettingsView({
                       onClick={() => void handleRemoveMember(member)}
                     >
                       <Icon name="trash" size={13} />
-                      {removing ? 'Removing...' : 'Remove'}
+                      {removing ? t('workspaceSettings.removing') : t('workspaceSettings.remove')}
                     </button>
                         </>
                       );
                     })()}
                     {member.userId === currentUserId ? (
-                      <span className="workspace-settings__action-note">Ask another admin to change your access.</span>
+                      <span className="workspace-settings__action-note">{t('workspaceSettings.askAdminChangeAccess')}</span>
                     ) : null}
                   </div>
                 )}
@@ -1119,14 +1128,14 @@ export function WorkspaceSettingsView({
       <section className="workspace-settings__section">
         <div className="workspace-settings__section-head">
           <div>
-            <h2>Ownership</h2>
-            <p>Transfer owner before the current owner leaves the workspace.</p>
+            <h2>{t('workspaceSettings.ownershipTitle')}</h2>
+            <p>{t('workspaceSettings.ownershipBody')}</p>
             {!isTeamWorkspace ? (
-              <p className="workspace-settings__hint">Personal workspace ownership cannot be transferred.</p>
+              <p className="workspace-settings__hint">{t('workspaceSettings.personalOwnershipLocked')}</p>
             ) : !isOwner ? (
-              ownerOnlyHint(isOwner)
+              ownerOnlyHint(isOwner, t)
             ) : transferableMembers.length === 0 ? (
-              <p className="workspace-settings__hint">Invite another member before transferring ownership.</p>
+              <p className="workspace-settings__hint">{t('workspaceSettings.inviteBeforeTransferOwner')}</p>
             ) : null}
           </div>
           <div className="workspace-settings__actions">
@@ -1147,7 +1156,7 @@ export function WorkspaceSettingsView({
               onClick={() => void handleTransferOwner()}
             >
               <Icon name="refresh" size={13} />
-              {transferringOwner ? 'Transferring...' : 'Transfer owner'}
+              {transferringOwner ? t('workspaceSettings.transferring') : t('workspaceSettings.transferOwner')}
             </button>
           </div>
         </div>
@@ -1156,32 +1165,32 @@ export function WorkspaceSettingsView({
       <section className="workspace-settings__section">
         <div className="workspace-settings__section-head">
           <div>
-            <h2>Invites</h2>
-            <p>Invite links let anonymous or signed-in users join this workspace.</p>
+            <h2>{t('workspaceSettings.invitesTitle')}</h2>
+            <p>{t('workspaceSettings.invitesBody')}</p>
             {!isTeamWorkspace ? (
-              <p className="workspace-settings__hint">Personal workspace does not accept invite links.</p>
-            ) : managerOnlyHint(canManage)}
+              <p className="workspace-settings__hint">{t('workspaceSettings.personalNoInvites')}</p>
+            ) : managerOnlyHint(canManage, t)}
           </div>
           <div className="workspace-settings__actions">
             <select
-              aria-label="Invite role"
+              aria-label={t('workspaceSettings.inviteRoleAria')}
               value={inviteRole}
               disabled={!canManage || !isTeamWorkspace}
               onChange={(event) => setInviteRole(event.target.value as 'member' | 'admin')}
             >
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
+              <option value="member">{t('workspaceSettings.roleMember')}</option>
+              <option value="admin">{t('workspaceSettings.roleAdmin')}</option>
             </select>
             <select
-              aria-label="Invite expiry"
+              aria-label={t('workspaceSettings.inviteExpiryAria')}
               value={inviteExpiresInDays}
               disabled={!canManage || !isTeamWorkspace}
               onChange={(event) => setInviteExpiresInDays(Number(event.target.value))}
             >
-              <option value={1}>1 day</option>
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
+              <option value={1}>{t('workspaceSettings.dayOption', { days: 1 })}</option>
+              <option value={7}>{t('workspaceSettings.daysOption', { days: 7 })}</option>
+              <option value={14}>{t('workspaceSettings.daysOption', { days: 14 })}</option>
+              <option value={30}>{t('workspaceSettings.daysOption', { days: 30 })}</option>
             </select>
             <button
               type="button"
@@ -1189,7 +1198,7 @@ export function WorkspaceSettingsView({
               onClick={() => void handleInvite()}
             >
               <Icon name="link" size={13} />
-              {creatingInvite ? 'Creating invite...' : 'Create invite'}
+              {creatingInvite ? t('workspaceSettings.creatingInvite') : t('workspaceSettings.createInvite')}
             </button>
             <button
               type="button"
@@ -1197,26 +1206,26 @@ export function WorkspaceSettingsView({
               onClick={() => setShowInviteHistory((value) => !value)}
             >
               <Icon name="history" size={13} />
-              {showInviteHistory ? 'Hide history' : `Show history (${inactiveInviteCount})`}
+              {showInviteHistory ? t('workspaceSettings.hideHistory') : t('workspaceSettings.showHistory', { count: inactiveInviteCount })}
             </button>
           </div>
         </div>
         <div className="workspace-settings__list">
           {!isTeamWorkspace ? (
-            <div className="workspace-settings__empty">Personal workspace does not accept invite links.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.personalNoInvites')}</div>
           ) : !canManage ? (
-            <div className="workspace-settings__empty">Only admins and owners can view or create invite links.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.invitesManagerOnly')}</div>
           ) : invites.length === 0 ? (
-            <div className="workspace-settings__empty">No invites yet.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.noInvites')}</div>
           ) : visibleInvites.length === 0 ? (
-            <div className="workspace-settings__empty">No active invite links. Show history to review accepted, expired, or revoked invites.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.noActiveInvites')}</div>
           ) : visibleInvites.map((invite) => {
             const revoking = revokingInviteIds.has(invite.id);
             return (
               <div className="workspace-settings__row" key={invite.id}>
                 <div>
-                  <strong>{inviteTitle(invite)}</strong>
-                  <span>{inviteMetaLabel(invite)}</span>
+                  <strong>{inviteTitle(invite, t)}</strong>
+                  <span>{inviteMetaLabel(invite, t)}</span>
                 </div>
                 <div className="workspace-settings__actions">
                   <button
@@ -1225,7 +1234,7 @@ export function WorkspaceSettingsView({
                     onClick={() => void handleCopyInvite(invite)}
                   >
                     <Icon name="copy" size={13} />
-                    Copy
+                    {t('workspaceSettings.copy')}
                   </button>
                   <button
                     type="button"
@@ -1233,7 +1242,7 @@ export function WorkspaceSettingsView({
                     onClick={() => void handleRevokeInvite(invite)}
                   >
                     <Icon name="trash" size={13} />
-                    {revoking ? 'Revoking...' : 'Revoke'}
+                    {revoking ? t('workspaceSettings.revoking') : t('workspaceSettings.revoke')}
                   </button>
                 </div>
               </div>
@@ -1245,23 +1254,23 @@ export function WorkspaceSettingsView({
       <section className="workspace-settings__section">
         <div className="workspace-settings__section-head">
           <div>
-            <h2>Viewer links</h2>
-            <p>External viewer links grant read-only access to one artifact, not the workspace.</p>
-            {viewerLinksHint(canManage)}
+            <h2>{t('workspaceSettings.viewerLinksTitle')}</h2>
+            <p>{t('workspaceSettings.viewerLinksBody')}</p>
+            {viewerLinksHint(canManage, t)}
           </div>
         </div>
         <div className="workspace-settings__list">
           {!canManage ? (
-            <div className="workspace-settings__empty">Only admins and owners can view external viewer links.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.viewerLinksManagerOnly')}</div>
           ) : shares.length === 0 ? (
-            <div className="workspace-settings__empty">No external viewer links yet.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.noViewerLinks')}</div>
           ) : shares.map((share) => {
             const revoking = revokingShareIds.has(share.id);
             return (
               <div className="workspace-settings__row" key={share.id}>
                 <div>
                   <strong>{share.shareUrl}</strong>
-                  <span>{shareMetaLabel(share)}</span>
+                  <span>{shareMetaLabel(share, t)}</span>
                 </div>
                 <div className="workspace-settings__actions">
                   <button
@@ -1270,7 +1279,7 @@ export function WorkspaceSettingsView({
                     onClick={() => void handleCopyShare(share)}
                   >
                     <Icon name="copy" size={13} />
-                    Copy
+                    {t('workspaceSettings.copy')}
                   </button>
                   <button
                     type="button"
@@ -1278,7 +1287,7 @@ export function WorkspaceSettingsView({
                     onClick={() => void handleRevokeShare(share)}
                   >
                     <Icon name="trash" size={13} />
-                    {revoking ? 'Revoking...' : 'Revoke'}
+                    {revoking ? t('workspaceSettings.revoking') : t('workspaceSettings.revoke')}
                   </button>
                 </div>
               </div>
@@ -1290,14 +1299,14 @@ export function WorkspaceSettingsView({
       <section className="workspace-settings__section">
         <div className="workspace-settings__section-head">
           <div>
-            <h2>Projects</h2>
-            <p>Move projects to another workspace before deleting this workspace.</p>
-            {managerOnlyHint(canManage)}
+            <h2>{t('workspaceSettings.projectsTitle')}</h2>
+            <p>{t('workspaceSettings.projectsBody')}</p>
+            {managerOnlyHint(canManage, t)}
           </div>
         </div>
         <div className="workspace-settings__list">
           {projects.length === 0 ? (
-            <div className="workspace-settings__empty">No projects in this workspace.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.noProjects')}</div>
           ) : projects.map((project) => {
             const targetWorkspaceId = projectMoveTargets[project.id] ?? '';
             const moving = movingProjectIds.has(project.id);
@@ -1315,15 +1324,15 @@ export function WorkspaceSettingsView({
                   <strong>{project.name}</strong>
                   <span>
                     {project.id}
-                    {project.ownedByUserId ? ` · owned by ${project.ownedByUserId}` : ''}
+                    {project.ownedByUserId ? ` · ${t('workspaceSettings.ownedBy', { user: project.ownedByUserId })}` : ''}
                     {project.createdByUserId && project.createdByUserId !== project.ownedByUserId
-                      ? ` · created by ${project.createdByUserId}`
+                      ? ` · ${t('workspaceSettings.createdBy', { user: project.createdByUserId })}`
                       : ''}
                   </span>
                 </div>
                 <div className="workspace-settings__actions">
                   <select
-                    aria-label={`Transfer owner for ${project.name}`}
+                    aria-label={t('workspaceSettings.transferProjectOwnerAria', { project: project.name })}
                     value={ownerTargetUserId}
                     disabled={!canManage || transferringOwner || projectOwnerMembers.length === 0}
                     onChange={(event) => setProjectOwnerTargets((current) => ({
@@ -1333,7 +1342,7 @@ export function WorkspaceSettingsView({
                   >
                     {projectOwnerMembers.map((member) => (
                       <option key={member.userId} value={member.userId}>
-                        Owner: {memberTitle(member, currentUserId)}
+                        {t('workspaceSettings.ownerOption', { member: memberTitle(member, currentUserId, t) })}
                       </option>
                     ))}
                   </select>
@@ -1343,10 +1352,10 @@ export function WorkspaceSettingsView({
                     onClick={() => void handleTransferProjectOwner(project)}
                   >
                     <Icon name="edit" size={13} />
-                    {transferringOwner ? 'Transferring...' : 'Transfer'}
+                    {transferringOwner ? t('workspaceSettings.transferring') : t('workspaceSettings.transfer')}
                   </button>
                   <select
-                    aria-label={`Move ${project.name}`}
+                    aria-label={t('workspaceSettings.moveProjectAria', { project: project.name })}
                     value={targetWorkspaceId}
                     disabled={!canManage || movableWorkspaces.length === 0 || moving}
                     onChange={(event) => setProjectMoveTargets((current) => ({
@@ -1354,7 +1363,7 @@ export function WorkspaceSettingsView({
                       [project.id]: event.target.value,
                     }))}
                   >
-                    <option value="">Move to...</option>
+                    <option value="">{t('workspaceSettings.moveToPlaceholder')}</option>
                     {movableWorkspaces.map((workspace) => (
                       <option key={workspace.id} value={workspace.id}>
                         {workspace.name}
@@ -1367,7 +1376,7 @@ export function WorkspaceSettingsView({
                     onClick={() => void handleMoveProject(project)}
                   >
                     <Icon name="arrow-left" size={13} />
-                    {moving ? 'Moving...' : 'Move'}
+                    {moving ? t('workspaceSettings.moving') : t('workspaceSettings.move')}
                   </button>
                 </div>
               </div>
@@ -1379,18 +1388,18 @@ export function WorkspaceSettingsView({
       <section className="workspace-settings__section workspace-settings__section--danger">
         <div className="workspace-settings__section-head">
           <div>
-            <h2>Workspace lifecycle</h2>
-            <p>Leave a team workspace, or delete an empty team workspace when you own it.</p>
+            <h2>{t('workspaceSettings.lifecycleTitle')}</h2>
+            <p>{t('workspaceSettings.lifecycleBody')}</p>
             {!isTeamWorkspace ? (
-              <p className="workspace-settings__hint">Personal workspace cannot be left or deleted.</p>
+              <p className="workspace-settings__hint">{t('workspaceSettings.personalCannotLeaveDelete')}</p>
             ) : isOwner ? (
               <>
-                <p className="workspace-settings__hint">Transfer ownership before leaving this workspace.</p>
+                <p className="workspace-settings__hint">{t('workspaceSettings.transferBeforeLeaving')}</p>
                 {projects.length > 0 ? (
-                  <p className="workspace-settings__hint">Move or delete all workspace projects before deleting the workspace.</p>
+                  <p className="workspace-settings__hint">{t('workspaceSettings.moveProjectsBeforeDelete')}</p>
                 ) : null}
                 {routines.length > 0 ? (
-                  <p className="workspace-settings__hint">Delete all workspace automations before deleting the workspace.</p>
+                  <p className="workspace-settings__hint">{t('workspaceSettings.deleteAutomationsBeforeDelete')}</p>
                 ) : null}
                 {projects.length === 0 && routines.length === 0 ? (
                   <p className="workspace-settings__hint">{deleteWorkspaceImpact}</p>
@@ -1405,7 +1414,7 @@ export function WorkspaceSettingsView({
               onClick={() => void handleLeaveWorkspace()}
             >
               <Icon name="arrow-left" size={13} />
-              {leavingWorkspace ? 'Leaving...' : 'Leave'}
+              {leavingWorkspace ? t('workspaceSettings.leaving') : t('workspaceSettings.leave')}
             </button>
             <button
               type="button"
@@ -1413,7 +1422,7 @@ export function WorkspaceSettingsView({
               onClick={() => void handleDeleteWorkspace()}
             >
               <Icon name="trash" size={13} />
-              {deletingWorkspace ? 'Deleting...' : 'Delete'}
+              {deletingWorkspace ? t('workspaceSettings.deleting') : t('common.delete')}
             </button>
           </div>
         </div>
@@ -1422,18 +1431,18 @@ export function WorkspaceSettingsView({
       <section className="workspace-settings__section">
         <div className="workspace-settings__section-head">
           <div>
-            <h2>Activity</h2>
-            <p>Recent workspace actions across invites, members, projects, and viewer links.</p>
+            <h2>{t('workspaceSettings.activityTitle')}</h2>
+            <p>{t('workspaceSettings.activityBody')}</p>
           </div>
         </div>
         <div className="workspace-settings__list">
           {activities.length === 0 ? (
-            <div className="workspace-settings__empty">No workspace activity yet.</div>
+            <div className="workspace-settings__empty">{t('workspaceSettings.noActivity')}</div>
           ) : activities.map((activity) => (
             <div className="workspace-settings__row workspace-settings__row--activity" key={activity.id}>
               <div className="workspace-settings__identity">
-                <strong>{activityLabel(activity)}</strong>
-                <span>{activityActorLabel(activity, currentUserId)}</span>
+                <strong>{activityLabel(activity, t)}</strong>
+                <span>{activityActorLabel(activity, currentUserId, t)}</span>
               </div>
               <span className="workspace-settings__time">{activityTimeLabel(activity.createdAt)}</span>
             </div>

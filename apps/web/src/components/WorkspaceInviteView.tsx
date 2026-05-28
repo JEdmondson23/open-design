@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AcceptWorkspaceInviteResponse } from '@open-design/contracts';
 import { acceptWorkspaceInviteResult } from '../state/workspaces';
+import { useT } from '../i18n';
 import { Icon } from './Icon';
 
 type InviteState =
@@ -9,40 +10,40 @@ type InviteState =
   | { status: 'already-joined'; workspaceName: string }
   | { status: 'error'; title: string; message: string; actionLabel: string; actionHref: string };
 
-function inviteErrorState(error: string): InviteState {
+function inviteErrorState(error: string, t: ReturnType<typeof useT>): InviteState {
   const normalized = error.toLowerCase();
   if (normalized.includes('revoked')) {
     return {
       status: 'error',
-      title: 'Invite link revoked',
-      message: 'This workspace invite was revoked by an admin or owner.',
-      actionLabel: 'Return to Open Design',
+      title: t('workspaceInvite.revokedTitle'),
+      message: t('workspaceInvite.revokedMessage'),
+      actionLabel: t('workspaceInvite.returnAction'),
       actionHref: '/',
     };
   }
   if (normalized.includes('expired')) {
     return {
       status: 'error',
-      title: 'Invite link expired',
-      message: 'Ask a workspace admin for a fresh invite link.',
-      actionLabel: 'Return to Open Design',
+      title: t('workspaceInvite.expiredTitle'),
+      message: t('workspaceInvite.expiredMessage'),
+      actionLabel: t('workspaceInvite.returnAction'),
       actionHref: '/',
     };
   }
   if (normalized.includes('already used') || normalized.includes('already accepted')) {
     return {
       status: 'error',
-      title: 'Invite link already used',
-      message: 'This one-time invite has already been accepted. Ask a workspace admin for a new link.',
-      actionLabel: 'Open workspace',
+      title: t('workspaceInvite.usedTitle'),
+      message: t('workspaceInvite.usedMessage'),
+      actionLabel: t('workspaceInvite.openWorkspaceAction'),
       actionHref: '/workspace',
     };
   }
   return {
     status: 'error',
-    title: 'Invite link not found',
+    title: t('workspaceInvite.notFoundTitle'),
     message: error,
-    actionLabel: 'Return to Open Design',
+    actionLabel: t('workspaceInvite.returnAction'),
     actionHref: '/',
   };
 }
@@ -54,6 +55,7 @@ export function WorkspaceInviteView({
   token: string;
   onAccepted: (result: AcceptWorkspaceInviteResponse) => Promise<void>;
 }) {
+  const t = useT();
   const [state, setState] = useState<InviteState>({ status: 'joining' });
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export function WorkspaceInviteView({
     void acceptWorkspaceInviteResult(token).then(async (result) => {
       if (cancelled) return;
       if (!result.ok) {
-        setState(inviteErrorState(result.error));
+        setState(inviteErrorState(result.error, t));
         return;
       }
       try {
@@ -71,9 +73,9 @@ export function WorkspaceInviteView({
         if (cancelled) return;
         setState({
           status: 'error',
-          title: 'Workspace joined',
-          message: 'The invite was accepted, but Open Design could not switch to the workspace automatically.',
-          actionLabel: 'Open workspace',
+          title: t('workspaceInvite.joinedSwitchFailedTitle'),
+          message: t('workspaceInvite.joinedSwitchFailedMessage'),
+          actionLabel: t('workspaceInvite.openWorkspaceAction'),
           actionHref: '/workspace',
         });
         return;
@@ -92,26 +94,26 @@ export function WorkspaceInviteView({
   return (
     <main className="workspace-invite-view">
       <section className="workspace-invite-card">
-        <a className="workspace-invite-brand" href="/" aria-label="Open Design">
+        <a className="workspace-invite-brand" href="/" aria-label={t('app.brand')}>
           <Icon name="orbit" size={18} />
-          <span>Open Design</span>
+          <span>{t('app.brand')}</span>
         </a>
         {state.status === 'joining' ? (
           <>
-            <strong>Joining workspace...</strong>
-            <span>We are accepting this invite and switching your workspace.</span>
+            <strong>{t('workspaceInvite.joiningTitle')}</strong>
+            <span>{t('workspaceInvite.joiningMessage')}</span>
           </>
         ) : state.status === 'joined' ? (
           <>
-            <strong>Joined {state.workspaceName}</strong>
-            <span>You can continue using Open Design in this workspace.</span>
-            <a className="workspace-invite-action" href="/workspace">Open workspace</a>
+            <strong>{t('workspaceInvite.joinedTitle', { name: state.workspaceName })}</strong>
+            <span>{t('workspaceInvite.joinedMessage')}</span>
+            <a className="workspace-invite-action" href="/workspace">{t('workspaceInvite.openWorkspaceAction')}</a>
           </>
         ) : state.status === 'already-joined' ? (
           <>
-            <strong>Already in {state.workspaceName}</strong>
-            <span>This invite was not consumed. You can keep working in this workspace.</span>
-            <a className="workspace-invite-action" href="/workspace">Open workspace</a>
+            <strong>{t('workspaceInvite.alreadyJoinedTitle', { name: state.workspaceName })}</strong>
+            <span>{t('workspaceInvite.alreadyJoinedMessage')}</span>
+            <a className="workspace-invite-action" href="/workspace">{t('workspaceInvite.openWorkspaceAction')}</a>
           </>
         ) : (
           <>
