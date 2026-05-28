@@ -497,10 +497,10 @@ export function App() {
         setDsLoading(false);
       });
 
-      void listWorkspaces().then((result) => {
+      void listWorkspaces().then(async (result) => {
         if (cancelled) return;
         const nextWorkspaceId = applyWorkspacesResponse(result);
-        void loadWorkspaceDataFor(nextWorkspaceId, () => cancelled);
+        await loadWorkspaceDataFor(nextWorkspaceId, () => cancelled);
       }).catch((err) => {
         if (cancelled) return;
         setWorkspaceLoadError(messageFromError(err, 'Could not load workspaces.'));

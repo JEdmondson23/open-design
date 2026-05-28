@@ -285,6 +285,20 @@ describe('App connectors settings flows', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
   });
 
+  it('shows a retryable workspace load failure when scoped project loading fails', async () => {
+    mockedListProjects.mockRejectedValueOnce(new Error('project index unavailable'));
+
+    render(<App />);
+
+    expect(await screen.findByText('Could not load workspaces')).toBeTruthy();
+    expect(screen.getByText('project index unavailable')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    await waitFor(() => {
+      expect(mockedListProjects).toHaveBeenCalledWith('local-personal');
+      expect(mockedListTemplates).toHaveBeenCalledWith('local-personal');
+    });
+  });
+
   it('does not show first-run privacy consent until daemon config hydration finishes', async () => {
     let resolveDaemonConfig: (value: Record<string, never>) => void = () => {};
     mockedFetchDaemonConfig.mockReturnValue(
