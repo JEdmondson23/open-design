@@ -882,6 +882,7 @@ export function SettingsDialog({
   });
   const [amrCardStatus, setAmrCardStatus] = useState<VelaLoginStatus | null>(null);
   const [amrCardStatusReady, setAmrCardStatusReady] = useState(false);
+  const [hoveredAgentCardId, setHoveredAgentCardId] = useState<string | null>(null);
   const [providerTestState, setProviderTestState] = useState<TestState>({
     status: 'idle',
   });
@@ -891,6 +892,7 @@ export function SettingsDialog({
     if (!hasAmrAgent) {
       setAmrCardStatus(null);
       setAmrCardStatusReady(false);
+      setHoveredAgentCardId(null);
       return;
     }
     let cancelled = false;
@@ -2657,6 +2659,12 @@ export function SettingsDialog({
                             isAmrAgent && active && amrCardStatus?.loggedIn
                               ? amrCardStatus.user?.email || t('settings.amrSignedIn')
                               : '';
+                          const amrRevealPendingCancelAction =
+                            isAmrAgent &&
+                            active &&
+                            hoveredAgentCardId === a.id &&
+                            amrCardStatus?.loggedIn !== true &&
+                            amrCardStatus?.loginInFlight === true;
                           const cardEl = (
                             <div
                               key={a.id}
@@ -2666,6 +2674,14 @@ export function SettingsDialog({
                                 (active ? ' active' : '') +
                                 (amrHighlighted ? ' agent-card--amr-highlight' : '')
                               }
+                              onMouseEnter={() => {
+                                if (!isAmrAgent || !active) return;
+                                setHoveredAgentCardId(a.id);
+                              }}
+                              onMouseLeave={() => {
+                                if (hoveredAgentCardId !== a.id) return;
+                                setHoveredAgentCardId(null);
+                              }}
                             >
                               <div className="agent-card-main">
                                 <button
@@ -2781,6 +2797,7 @@ export function SettingsDialog({
                                         initialStatus={amrCardStatus}
                                         skipInitialRefresh
                                         signInLabel={t('settings.amrAuthorize')}
+                                        revealPendingCancelAction={amrRevealPendingCancelAction}
                                         onStatusChange={setAmrCardStatus}
                                       />
                                     </span>

@@ -23,12 +23,14 @@ interface AmrLoginPillProps {
   initialStatus?: VelaLoginStatus | null;
   skipInitialRefresh?: boolean;
   signInLabel?: string;
+  revealPendingCancelAction?: boolean;
   onStatusChange?: (status: VelaLoginStatus | null) => void;
 }
 
 export type AmrAccountControlStatus =
   | 'signed-out'
   | 'signing-in'
+  | 'canceled'
   | 'signed-in'
   | 'error';
 
@@ -44,10 +46,26 @@ export interface AmrAccountControlProps {
   hideSignedOutStatus?: boolean;
   hideSignedInStatus?: boolean;
   signInLabel?: string;
+  showCancelSignInAction?: boolean;
   onSignIn?: (event: MouseEvent<HTMLButtonElement>) => void;
   onSignOut?: (event: MouseEvent<HTMLButtonElement>) => void;
+  onCancelSignIn?: (event: MouseEvent<HTMLButtonElement>) => void;
   signInDisabled?: boolean;
   signOutDisabled?: boolean;
+  cancelSignInDisabled?: boolean;
+}
+
+const AMR_CANCELED_RESET_MS = 1500;
+
+function closeAmrActivationWindowBestEffort(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.opener == null) return false;
+  try {
+    window.close();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function profileBadgeLabel(profile: string | undefined): string | null {
@@ -71,15 +89,19 @@ export function AmrAccountControl({
   hideSignedOutStatus = false,
   hideSignedInStatus = false,
   signInLabel,
+  showCancelSignInAction = false,
   onSignIn,
   onSignOut,
+  onCancelSignIn,
   signInDisabled = false,
   signOutDisabled = false,
+  cancelSignInDisabled = false,
 }: AmrAccountControlProps) {
   const { t } = useI18n();
   const badgeLabel = showProfileBadge ? profileBadgeLabel(profile) : null;
   const isSignedIn = status === 'signed-in';
   const isSigningIn = status === 'signing-in';
+  const isCanceled = status === 'canceled';
   const hasError = status === 'error';
   const statusText = isSignedIn
     ? hideSignedInStatus
@@ -87,6 +109,8 @@ export function AmrAccountControl({
       : email || t('settings.amrSignedIn')
     : isSigningIn
       ? t('settings.amrSigningIn')
+      : isCanceled
+        ? t('designs.status.canceled')
       : hideSignedOutStatus
         ? ''
         : t('settings.amrNotSignedIn');
@@ -116,6 +140,17 @@ export function AmrAccountControl({
           aria-label={t('settings.amrLogout')}
         >
           {signOutDisabled ? t('settings.amrLoggingOut') : t('settings.amrLogout')}
+        </button>
+      ) : null}
+      {isSigningIn && showCancelSignInAction && onCancelSignIn ? (
+        <button
+          type="button"
+          className="amr-account-control__action"
+          disabled={cancelSignInDisabled}
+          onClick={onCancelSignIn}
+          aria-label={t('common.cancel')}
+        >
+          {t('common.cancel')}
         </button>
       ) : null}
       {canSignIn ? (
@@ -150,12 +185,14 @@ export function AmrLoginPill({
   initialStatus = null,
   skipInitialRefresh = false,
   signInLabel,
+  revealPendingCancelAction = false,
   onStatusChange,
 }: AmrLoginPillProps) {
   const { t } = useI18n();
   const [status, setStatus] = useState<VelaLoginStatus | null>(initialStatus);
-  const [pending, setPending] = useState<null | 'login' | 'logout'>(null);
+  const [pending, setPending] = useState<null | 'login' | 'logout' | 'cancel'>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [canceledVisible, setCanceledVisible] = useState(false);
   const pollRef = useRef<number | null>(null);
   const loginStartedAtRef = useRef<number | null>(null);
   const loginPendingRef = useRef(false);
@@ -185,6 +222,14 @@ export function AmrLoginPill({
   useEffect(() => {
     setStatus(initialStatus);
   }, [initialStatus]);
+
+  useEffect(() => {
+    if (!canceledVisible) return;
+    const timeout = window.setTimeout(() => {
+      setCanceledVisible(false);
+    }, AMR_CANCELED_RESET_MS);
+    return () => window.clearTimeout(timeout);
+  }, [canceledVisible]);
 
   useEffect(() => {
     onStatusChange?.(status);
@@ -235,6 +280,22 @@ export function AmrLoginPill({
         loginPendingRef.current = false;
         stopPolling();
         setPending(null);
+        // Skip the daemon refresh below. `cancelVelaLogin()` only sends
+        // SIGTERM (escalating to SIGKILL after 2s) and keeps the child
+        // in `activeLoginProcs` until it actually exits, so an
+        // immediate `/api/integrations/vela/status` read can legally
+        // still return `loginInFlight: true`. Falling through to the
+        // refresh + restart-polling branch below would bounce the pill
+        // back into 'Signing in…' and could surface the timeout/error
+        // path even though the user already canceled. Trust the cancel
+        // locally on every subscribed pill instance instead — the next
+        // explicit refresh (mount, user interaction, or a
+        // `status-changed` event) will pick up the daemon's confirmed
+        // state once the child has actually exited.
+        setStatus((current) => (
+          current ? { ...current, loginInFlight: false } : current
+        ));
+        return;
       }
       void refresh().then((next) => {
         if (!next) return;
@@ -243,6 +304,7 @@ export function AmrLoginPill({
           loginStartedAtRef.current = null;
           loginPendingRef.current = false;
           setPending(null);
+          setCanceledVisible(false);
           setErrorMessage(null);
           return;
         }
@@ -291,6 +353,39 @@ export function AmrLoginPill({
     [startPolling, t],
   );
 
+  const handleCancelLogin = useCallback(
+    async (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      stopPolling();
+      setErrorMessage(null);
+      setPending('cancel');
+      const result = await cancelVelaLogin();
+      closeAmrActivationWindowBestEffort();
+      loginStartedAtRef.current = null;
+      loginPendingRef.current = false;
+      if (!result.ok) {
+        setPending(null);
+        setErrorMessage(t('settings.amrLoginErrorCompact'));
+        return;
+      }
+      setStatus((current) => (
+        current
+          ? { ...current, loggedIn: false, loginInFlight: false, user: null }
+          : {
+              loggedIn: false,
+              loginInFlight: false,
+              profile: 'default',
+              user: null,
+              configPath: '',
+            }
+      ));
+      setPending(null);
+      setCanceledVisible(true);
+      notifyAmrLoginStatusChanged('login-canceled');
+    },
+    [stopPolling, t],
+  );
+
   const handleLogout = useCallback(
     async (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
@@ -315,10 +410,13 @@ export function AmrLoginPill({
   const loginInFlight =
     pending === 'login' || (status?.loggedIn !== true && status?.loginInFlight === true);
   const logoutInFlight = pending === 'logout';
+  const cancelInFlight = pending === 'cancel';
   const accountStatus: AmrAccountControlStatus = errorMessage
     ? 'error'
     : loggedIn
       ? 'signed-in'
+      : canceledVisible
+        ? 'canceled'
       : loginInFlight
         ? 'signing-in'
         : 'signed-out';
@@ -340,8 +438,11 @@ export function AmrLoginPill({
         signInLabel={signInLabel}
         signInDisabled={loginInFlight}
         signOutDisabled={logoutInFlight}
+        showCancelSignInAction={revealPendingCancelAction && loginInFlight}
+        cancelSignInDisabled={cancelInFlight}
         onSignIn={handleLogin}
         onSignOut={handleLogout}
+        onCancelSignIn={handleCancelLogin}
         className={loggedIn ? 'amr-login-pill-status' : undefined}
       />
     </div>
