@@ -1,9 +1,11 @@
 import type { CSSProperties } from 'react';
 import { Button, Textarea } from '@open-design/components';
+import { useRef } from 'react';
 
 import type { PreviewCommentSnapshot } from '../comments';
 import type { Dict } from '../i18n/types';
 import type { PreviewComment, PreviewCommentMember } from '../types';
+import { isImeComposing } from '../utils/imeComposing';
 
 import { Icon } from './Icon';
 
@@ -263,6 +265,8 @@ export function BoardComposerPopover({
   const pendingCount = notes.length + (draft.trim() ? 1 : 0);
   const hasCommentChange = !existing || draft.trim() !== existing.note.trim();
   const podMembers = target.podMembers ?? [];
+  const composingRef = useRef(false);
+  const sendDisabled = pendingCount === 0 || sending;
   return (
     <div
       className={`comment-popover${docked ? ' comment-popover-docked' : ''}`}
@@ -336,6 +340,25 @@ export function BoardComposerPopover({
             aria-label={t('chat.comments.placeholder')}
             placeholder={t('chat.comments.placeholder')}
             onChange={(event) => onDraft(event.target.value)}
+            onCompositionStart={() => {
+              composingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              composingRef.current = false;
+            }}
+            onKeyDown={(event) => {
+              if (isImeComposing(event, composingRef.current)) return;
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.altKey &&
+                (event.metaKey || event.ctrlKey)
+              ) {
+                event.preventDefault();
+                if (sendDisabled) return;
+                void onSendBatch();
+              }
+            }}
           />
           <div className="comment-popover-actions">
             <div className="comment-popover-actions-start">
@@ -384,7 +407,7 @@ export function BoardComposerPopover({
               <Button
                 variant="primary"
                 data-testid="comment-add-send"
-                disabled={pendingCount === 0 || sending}
+                disabled={sendDisabled}
                 onClick={() => void onSendBatch()}
               >
                 {sending ? t('chat.comments.sending') : t('chat.comments.sendToChat')}

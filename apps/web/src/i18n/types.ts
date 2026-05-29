@@ -118,6 +118,11 @@ export interface Dict {
   'settings.onboardingAmrCloudBenefitReady': string;
   'settings.onboardingAmrCloudBenefitModels': string;
   'settings.onboardingAmrCloudBenefitPricing': string;
+  'settings.onboardingAmrCloudUpcomingLabel': string;
+  'settings.onboardingAmrCloudUpcomingImageVideo': string;
+  'settings.onboardingAmrCloudUpcomingSkills': string;
+  'settings.onboardingAmrCloudUpcomingRouting': string;
+  'settings.onboardingAmrModelSourceLabel': string;
   'settings.onboardingAmrCloudAuthorizeAction': string;
   'settings.onboardingAmrCloudAuthorizedAction': string;
   'settings.onboardingStepConnect': string;
