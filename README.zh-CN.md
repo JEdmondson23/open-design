@@ -3,7 +3,7 @@
 > 🔥 Open Design 0.8.0 已发布。这一版重点上线两件事：Plugin 体系，让模板和工作流像文件夹一样添加、复制、分享；Design System，支持导入品牌规范并沉淀为可复用的 [`DESIGN.md`](design-systems/)。[下载 0.8.0](https://github.com/nexu-io/open-design/releases) · [参与讨论](https://github.com/nexu-io/open-design/discussions/1727)
 
 <p align="center">
-  <img src="docs/assets/banner-zh.png" alt="Open Design — The open-source Claude Design alternative · 129 Design Systems · 116 Plugins · 16 Coding Agents · 14 Media Providers" width="100%" />
+  <img src="docs/assets/banner-zh.png" alt="Open Design — The open-source Claude Design alternative · 129 Design Systems · 116 Plugins · 16 Coding Agents · 14 Media Providers" width="720" />
 </p>
 
 <p align="center">
@@ -46,6 +46,69 @@ Open Design 是这样一种产物：Anthropic 随 Claude Design 推出的 **Agen
 它也是 **Agent 时代的 Figma 替代品**——不再在画布上推像素，而是用真实 CSS、真实字体、真实组件交付单页工件，直接导出 HTML / PDF / PPTX / MP4——已经由你的设计系统塑形，已经可以在你日常使用的 Agent 中运行。
 
 [cd]: https://x.com/claudeai/status/2045156267690213649
+
+---
+
+## 产品一览
+
+一张图看懂 Open Design 长什么样、能做什么。从这里进入：**Home** 总览、**Automation** 编排任务、**Design System** 沉淀品牌契约、**Plugin** 扩展能力；进入任一项目的 **Studio**，即可流式产出原型、实时工件、HyperFrame、演示文稿与图片。
+
+### 核心页面
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/product/home.png" alt="Home 页" /><br/>
+<sub><b>Home</b>——总览入口。选择技能、设计系统，输入需求，一处发起所有创作。</sub>
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/product/automation.png" alt="Automation 页" /><br/>
+<sub><b>Automation</b>——把重复的设计流程编排成可复用的自动化任务。</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/product/design-system.png" alt="Design System 页" /><br/>
+<sub><b>Design System</b>——把团队的 <code>DESIGN.md</code> 沉淀为品牌契约，所有产物据此塑形。</sub>
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/product/plugin.png" alt="Plugin 页" /><br/>
+<sub><b>Plugin</b>——400+ 开箱即用插件，按需扩展生成能力。</sub>
+</td>
+</tr>
+</table>
+
+### Studio——一个项目里的多种产物
+
+进入某个项目的 Studio，同一套设计系统可流式产出多种类型的工件：
+
+<table>
+<tr>
+<td width="33%" valign="top">
+<img src="docs/screenshots/product/studio-prototype.png" alt="原型" /><br/>
+<sub><b>原型</b>——Web · 桌面 · 移动端单页 HTML 工件。</sub>
+</td>
+<td width="33%" valign="top">
+<img src="docs/screenshots/product/studio-live.png" alt="实时制品" /><br/>
+<sub><b>实时制品</b>——可调参、原地可编辑的实时仪表盘与工件。</sub>
+</td>
+<td width="33%" valign="top">
+<img src="docs/screenshots/product/studio-hyperframe.png" alt="HyperFrame" /><br/>
+<sub><b>HyperFrame</b>——动态图形与动效帧。</sub>
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top">
+<img src="docs/screenshots/product/studio-ppt.png" alt="PPT" /><br/>
+<sub><b>PPT</b>——可导出 PPTX 的演示文稿。</sub>
+</td>
+<td width="33%" valign="top">
+<img src="docs/screenshots/product/studio-image.png" alt="图片" /><br/>
+<sub><b>图片</b>——品牌级图片与视觉素材。</sub>
+</td>
+<td width="33%" valign="top"></td>
+</tr>
+</table>
 
 ---
 
