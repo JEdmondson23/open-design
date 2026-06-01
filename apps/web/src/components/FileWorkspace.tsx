@@ -76,6 +76,9 @@ interface Props {
   commentQueueOnSend?: boolean;
   commentSendDisabled?: boolean;
   openRequest?: { name: string; nonce: number } | null;
+  // Open the named file AND surface its Share/Export menu. Drives the chat-side
+  // "Share" next-step action without a dedicated share backend.
+  shareRequest?: { name: string; nonce: number } | null;
   liveArtifactEvents?: LiveArtifactEventItem[];
   designSystemActivityEvents?: AgentEvent[];
   // Persisted set of open tabs + active tab. Owned by ProjectView so the
@@ -220,6 +223,7 @@ export function FileWorkspace({
   commentQueueOnSend = false,
   commentSendDisabled = false,
   openRequest,
+  shareRequest,
   liveArtifactEvents = [],
   designSystemActivityEvents = [],
   tabsState,
@@ -355,6 +359,20 @@ export function FileWorkspace({
     setActiveTab(name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest]);
+
+  // Share request: ensure the target file is open + active so the FileViewer
+  // below receives the matching `shareRequest` and opens its Share menu.
+  useEffect(() => {
+    if (!shareRequest) return;
+    const name = shareRequest.name;
+    if (!name) return;
+    onTabsStateChange({
+      tabs: persistedTabs.includes(name) ? persistedTabs : [...persistedTabs, name],
+      active: name,
+    });
+    setActiveTab(name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shareRequest]);
 
   function openFile(name: string) {
     setUploadError(null);
@@ -1145,6 +1163,11 @@ export function FileWorkspace({
             onOpenFileReplacing={openFileReplacing}
             commentPortalId={commentPortalId}
             onCommentModeChange={onCommentModeChange}
+            shareRequest={
+              shareRequest && shareRequest.name === activeFile.name
+                ? { nonce: shareRequest.nonce }
+                : null
+            }
           />
         ) : (
           <div className="viewer-empty">

@@ -265,6 +265,9 @@ interface Props {
   onSubmitForm?: (text: string) => void;
   onContinueRemainingTasks?: (assistantMessage: ChatMessage, todos: TodoItem[]) => void;
   onAssistantFeedback?: (assistantMessage: ChatMessage, change: ChatMessageFeedbackChange) => void;
+  // "Next step" affordance handlers forwarded to the last assistant message.
+  onArtifactShare?: (fileName: string) => void;
+  onArtifactChip?: (fileName: string, prompt: string) => void;
   // Header "+" button — kicks off ProjectView's create-conversation flow.
   onNewConversation?: () => void;
   newConversationDisabled?: boolean;
@@ -379,6 +382,8 @@ export function ChatPane({
   onSubmitForm,
   onContinueRemainingTasks,
   onAssistantFeedback,
+  onArtifactShare,
+  onArtifactChip,
   onNewConversation,
   newConversationDisabled = false,
   conversations,
@@ -1184,6 +1189,8 @@ export function ChatPane({
                             ? (rating) => onAssistantFeedback(m, rating)
                             : undefined
                         }
+                        onArtifactShare={onArtifactShare}
+                        onArtifactChip={onArtifactChip}
                       />
                     )}
                   </Fragment>

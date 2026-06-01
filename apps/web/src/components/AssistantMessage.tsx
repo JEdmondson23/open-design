@@ -40,6 +40,7 @@ import {
 } from "./design-files/pluginFolders";
 import type { PluginFolderAgentAction } from "./design-files/pluginFolderActions";
 import { Icon } from "./Icon";
+import { NextStepActions } from "./NextStepActions";
 import { useT } from "../i18n";
 import { deriveFileOps, type FileOpEntry } from "../runtime/file-ops";
 import {
@@ -315,6 +316,11 @@ interface Props {
   onFeedback?: (change: ChatMessageFeedbackChange) => void;
   suppressDirectionForms?: boolean;
   hasDesignSystemContext?: boolean;
+  // "Next step" affordance handlers, surfaced under the last assistant message
+  // once it has produced a previewable (HTML) artifact. Omitting them hides
+  // the affordance entirely (e.g. in tests that don't wire chat send).
+  onArtifactShare?: (fileName: string) => void;
+  onArtifactChip?: (fileName: string, prompt: string) => void;
 }
 
 /**
@@ -346,6 +352,8 @@ export function AssistantMessage({
   onFeedback,
   suppressDirectionForms = false,
   hasDesignSystemContext = false,
+  onArtifactShare,
+  onArtifactChip,
 }: Props) {
   const t = useT();
   const events = message.events ?? [];
@@ -376,6 +384,13 @@ export function AssistantMessage({
             streaming,
           }),
     [blocks, fileOps, message, produced, projectFiles, streaming],
+  );
+  // The single artifact the "next step" affordance anchors to: prefer the
+  // first HTML produced file (decks/prototypes are HTML and are the ones the
+  // Share/Export menu + visual-polish loop apply to).
+  const nextStepArtifactName = useMemo(
+    () => pickPreviewableArtifact(displayedProduced),
+    [displayedProduced],
   );
   const pluginActionFolders = useMemo(
     () =>
@@ -596,6 +611,18 @@ export function AssistantMessage({
             onRequestOpenFile={onRequestOpenFile}
           />
         ) : null}
+        {!streaming &&
+        isLast &&
+        projectId &&
+        nextStepArtifactName &&
+        onArtifactShare &&
+        onArtifactChip ? (
+          <NextStepActions
+            fileName={nextStepArtifactName}
+            onShare={onArtifactShare}
+            onChip={onArtifactChip}
+          />
+        ) : null}
         {!streaming && projectId && pluginActionFolders.length > 0 ? (
           <PluginActionPanel
             folders={pluginActionFolders}
@@ -676,6 +703,17 @@ export function AssistantMessage({
       </div>
     </div>
   );
+}
+
+// Return the name of the first previewable HTML artifact among the produced
+// files, or null if this turn produced no shareable/polishable preview. Only
+// HTML files drive the preview workspace's Share/Export menu and the
+// visual-polish loop, so the "next step" affordance keys off them.
+function pickPreviewableArtifact(files: ProjectFile[]): string | null {
+  const html = files.find(
+    (f) => f.kind === "html" || /\.html?$/i.test(f.name),
+  );
+  return html ? html.name : null;
 }
 
 function inferProducedFilesFromTurn({

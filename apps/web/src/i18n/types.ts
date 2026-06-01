@@ -2413,6 +2413,13 @@ export interface Dict {
   'assistant.producedFiles': string;
   'assistant.openFile': string;
   'assistant.downloadFile': string;
+  'nextStep.title': string;
+  'nextStep.share': string;
+  'nextStep.chipJoiner': string;
+  'nextStep.chipPolishVisual': string;
+  'nextStep.chipBrand': string;
+  'nextStep.chipConcise': string;
+  'nextStep.chipSecondVersion': string;
   'assistant.thinking': string;
   'assistant.systemReminder': string;
   'assistant.waitingFirstOutput': string;
