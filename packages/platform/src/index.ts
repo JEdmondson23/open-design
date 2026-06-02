@@ -347,15 +347,25 @@ export function parseMacosScutilProxyOutput(
   );
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+type RegistryEntry = {
+  name: string;
+  type: string;
+  value: string;
+};
+
+function parseRegistryEntries(stdout: string): RegistryEntry[] {
+  return Array.from(stdout.matchAll(/^\s*(\S+)\s+(REG_\w+)\s+(.+)$/gim), (match) => ({
+    name: match[1].trim(),
+    type: match[2].trim().toUpperCase(),
+    value: match[3].trim(),
+  }));
 }
 
-function parseRegistryEntry(stdout: string, valueName: string): { type: string; value: string } | null {
-  const match = stdout.match(
-    new RegExp(`^\\s*${escapeRegExp(valueName)}\\s+(REG_\\w+)\\s+(.+)$`, "im"),
+function parseRegistryEntry(stdout: string, valueName: string): Omit<RegistryEntry, "name"> | null {
+  const entry = parseRegistryEntries(stdout).find(
+    (candidate) => candidate.name.toLowerCase() === valueName.toLowerCase(),
   );
-  return match ? { type: match[1].trim().toUpperCase(), value: match[2].trim() } : null;
+  return entry ? { type: entry.type, value: entry.value } : null;
 }
 
 function parseRegistryValue(stdout: string, valueName: string): string | null {
@@ -367,6 +377,14 @@ function expandWindowsEnvironmentValue(value: string, env: NodeJS.ProcessEnv): s
     const match = Object.entries(env).find(([key]) => key.toLowerCase() === name.toLowerCase());
     return match?.[1] ?? placeholder;
   });
+}
+
+function parseWindowsUserEnvironmentExpansionEnv(stdout: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const entry of parseRegistryEntries(stdout)) {
+    env[entry.name] = entry.value;
+  }
+  return env;
 }
 
 export function parseWindowsInternetSettingsProxyOutput(
@@ -450,6 +468,9 @@ export function resolveSystemProxyEnv(options: ResolveSystemProxyEnvOptions = {}
       return parseMacosScutilProxyOutput(tryRun("scutil", ["--proxy"]), platform);
     }
     if (platform === "win32") {
+      const userEnvironmentOutput = tryRun("reg", ["query", "HKCU\\Environment"]);
+      const userEnvironmentExpansionEnv =
+        parseWindowsUserEnvironmentExpansionEnv(userEnvironmentOutput);
       return mergeProxyAwareEnv(
         platform,
         parseWindowsInternetSettingsProxyOutput(
@@ -477,38 +498,14 @@ export function resolveSystemProxyEnv(options: ResolveSystemProxyEnvOptions = {}
         ),
         parseWindowsUserEnvironmentProxyOutput(
           {
-            HTTP_PROXY: tryRun("reg", [
-              "query",
-              "HKCU\\Environment",
-              "/v",
-              "HTTP_PROXY",
-            ]),
-            HTTPS_PROXY: tryRun("reg", [
-              "query",
-              "HKCU\\Environment",
-              "/v",
-              "HTTPS_PROXY",
-            ]),
-            ALL_PROXY: tryRun("reg", [
-              "query",
-              "HKCU\\Environment",
-              "/v",
-              "ALL_PROXY",
-            ]),
-            NO_PROXY: tryRun("reg", [
-              "query",
-              "HKCU\\Environment",
-              "/v",
-              "NO_PROXY",
-            ]),
-            NODE_USE_ENV_PROXY: tryRun("reg", [
-              "query",
-              "HKCU\\Environment",
-              "/v",
-              "NODE_USE_ENV_PROXY",
-            ]),
+            ALL_PROXY: userEnvironmentOutput,
+            HTTP_PROXY: userEnvironmentOutput,
+            HTTPS_PROXY: userEnvironmentOutput,
+            NODE_USE_ENV_PROXY: userEnvironmentOutput,
+            NO_PROXY: userEnvironmentOutput,
           },
           platform,
+          userEnvironmentExpansionEnv,
         ),
       );
     }

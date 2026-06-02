@@ -452,16 +452,11 @@ HKEY_CURRENT_USER\\Environment
       platform: "win32",
       runCommand(command, args) {
         expect(command).toBe("reg");
-        const valueName = args.at(-1);
-        if (args.includes("HKCU\\Environment") && valueName === "HTTP_PROXY") {
+        if (args.includes("HKCU\\Environment")) {
+          expect(args).toEqual(["query", "HKCU\\Environment"]);
           return `
 HKEY_CURRENT_USER\\Environment
     HTTP_PROXY    REG_SZ    http://127.0.0.1:7890
-`;
-        }
-        if (args.includes("HKCU\\Environment") && valueName === "HTTPS_PROXY") {
-          return `
-HKEY_CURRENT_USER\\Environment
     HTTPS_PROXY    REG_SZ    http://127.0.0.1:7890
 `;
         }
@@ -474,12 +469,31 @@ HKEY_CURRENT_USER\\Environment
     expect(env.NODE_USE_ENV_PROXY).toBe("1");
   });
 
+  it("resolves Windows REG_EXPAND_SZ proxy values from registry-backed user env", () => {
+    const env = resolveSystemProxyEnv({
+      platform: "win32",
+      runCommand(_command, args) {
+        if (args.includes("HKCU\\Environment")) {
+          return `
+HKEY_CURRENT_USER\\Environment
+    CORP_PROXY_URL    REG_SZ    http://registry-proxy:7890
+    HTTPS_PROXY    REG_EXPAND_SZ    %CORP_PROXY_URL%
+`;
+        }
+        return "";
+      },
+    });
+
+    expect(env.HTTPS_PROXY).toBe("http://registry-proxy:7890");
+    expect(env.NODE_USE_ENV_PROXY).toBe("1");
+  });
+
   it("lets Windows user-level proxy env override Internet Settings proxy values", () => {
     const env = resolveSystemProxyEnv({
       platform: "win32",
       runCommand(_command, args) {
         const valueName = args.at(-1);
-        if (args.includes("HKCU\\Environment") && valueName === "HTTP_PROXY") {
+        if (args.includes("HKCU\\Environment")) {
           return `
 HKEY_CURRENT_USER\\Environment
     HTTP_PROXY    REG_SZ    http://env-proxy:7890
