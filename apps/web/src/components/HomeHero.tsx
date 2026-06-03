@@ -1914,10 +1914,29 @@ function buildHomeMentionEntities({
   skillOptions: SkillSummary[];
 }): InlineMentionEntity[] {
   const entities: InlineMentionEntity[] = [];
-  // Connectors are registered FIRST so that when a connector and a plugin share
-  // a name (e.g. both "Notion"), the `@Notion` token resolves to the connector
-  // — matching the user's intent when they pick it from the Connectors submenu,
-  // and giving it the richer logo + brand-color chip.
+  const pluginSeen = new Set<string>();
+  // A plugin the user EXPLICITLY picked (it lives in selectedPluginContexts) is
+  // registered ahead of connectors so that when a connector and that plugin
+  // share a name (e.g. both "Notion"), the `@Notion` token resolves to the
+  // plugin the user actually chose — the parser keeps the first-registered
+  // entity for an equal-length token, so insertion order is what round-trips
+  // the choice. Without this, `@Notion` would collapse onto the connector and
+  // the chip would open connector (not plugin) details.
+  for (const plugin of selectedPluginContexts) {
+    if (pluginSeen.has(plugin.id)) continue;
+    pluginSeen.add(plugin.id);
+    entities.push({
+      id: plugin.id,
+      kind: 'plugin',
+      label: plugin.title,
+      token: pluginMentionText(plugin),
+      title: `Plugin: ${plugin.title}`,
+    });
+  }
+  // Connectors are registered before the REMAINING (merely-installed, not
+  // explicitly picked) plugins so that for an ambiguous `@Notion` the connector
+  // wins by default and gets the richer logo + brand-color chip — unless the
+  // user deliberately selected the same-named plugin above.
   for (const connector of connectorOptions) {
     entities.push({
       id: connector.id,
@@ -1936,8 +1955,7 @@ function buildHomeMentionEntities({
       });
     }
   }
-  const pluginSeen = new Set<string>();
-  for (const plugin of [...selectedPluginContexts, ...pluginOptions]) {
+  for (const plugin of pluginOptions) {
     if (pluginSeen.has(plugin.id)) continue;
     pluginSeen.add(plugin.id);
     entities.push({
