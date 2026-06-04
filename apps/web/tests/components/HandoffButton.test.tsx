@@ -11,6 +11,7 @@ import { readExpandedIndexCss } from '../helpers/read-expanded-css';
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   window.localStorage.clear();
 });
 
@@ -64,6 +65,22 @@ describe('HandoffButton i18n', () => {
     const trigger = await screen.findByTestId('handoff-trigger');
     expect(trigger.getAttribute('title')).toBe('Open in Finder');
     expect(trigger.querySelector('.handoff-trigger-label')?.classList.contains('sr-only')).toBe(true);
+  });
+
+  it('does not show the preferred editor row as selected', async () => {
+    window.localStorage.setItem('open-design:preferred-editor', 'cursor');
+    stubEditors([
+      { id: 'cursor', label: 'Cursor', available: true },
+      { id: 'finder', label: 'Finder', available: true },
+    ]);
+
+    renderLocalized('en');
+
+    fireEvent.click(await screen.findByTestId('handoff-caret'));
+    const cursorRow = await screen.findByTestId('handoff-menu-item-cursor');
+
+    expect(cursorRow.className).not.toContain('active');
+    expect(cursorRow.getAttribute('aria-current')).toBeNull();
   });
 
   it('localizes the unavailable editor section', async () => {

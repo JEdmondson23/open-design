@@ -3512,6 +3512,7 @@ function CommentPreviewOverlays({
   hoveredTarget,
   hoveredPodMemberId,
   activeTarget,
+  activeExistingCommentId = null,
   boardTool,
   showActivePin = false,
   scale,
@@ -3526,6 +3527,7 @@ function CommentPreviewOverlays({
   hoveredTarget: PreviewCommentSnapshot | null;
   hoveredPodMemberId: string | null;
   activeTarget: PreviewCommentSnapshot | null;
+  activeExistingCommentId?: string | null;
   boardTool: BoardTool;
   showActivePin?: boolean;
   scale: number;
@@ -3539,15 +3541,15 @@ function CommentPreviewOverlays({
   const visibleComments = useMemo(
     () =>
       comments
-        .filter((comment) => commentVisibleOnDeckSlide(comment, activeSlideIndex))
-        .map((comment, index) => ({
+        .map((comment, globalIndex) => ({
           comment,
-          index,
+          markerNumber: globalIndex + 1,
           snapshot: liveSnapshotForComment(comment, liveTargets),
         }))
-        .filter((item): item is { comment: PreviewComment; index: number; snapshot: PreviewCommentSnapshot } =>
+        .filter((item): item is { comment: PreviewComment; markerNumber: number; snapshot: PreviewCommentSnapshot } =>
           Boolean(item.snapshot),
-        ),
+        )
+        .filter(({ comment }) => commentVisibleOnDeckSlide(comment, activeSlideIndex)),
     [comments, liveTargets, activeSlideIndex],
   );
   // `onOpenComment` is an inline arrow from the parent (new identity every
@@ -3563,7 +3565,7 @@ function CommentPreviewOverlays({
   // comments reuses the whole subtree and React skips reconciling it.
   const savedMarkers = useMemo(
     () =>
-      visibleComments.map(({ comment, index, snapshot }) => {
+      visibleComments.map(({ comment, markerNumber, snapshot }) => {
         const bounds = overlayBoundsFromSnapshot(snapshot, scale, overlayOffset);
         const label = commentTargetDisplayName(comment);
         return (
@@ -3587,22 +3589,22 @@ function CommentPreviewOverlays({
                 event.stopPropagation();
                 onOpenCommentRef.current(comment, snapshot);
               }}
-              title={`${index + 1}. ${label}: ${comment.note}`}
+              title={`${markerNumber}. ${label}: ${comment.note}`}
               aria-label={`Open comment for ${label}`}
             >
-              {index + 1}
+              {markerNumber}
             </button>
           </div>
         );
       }),
     [visibleComments, scale, overlayOffset],
   );
-  const activeSavedIndex = activeTarget
-    ? visibleComments.findIndex(({ snapshot }) => snapshot.elementId === activeTarget.elementId)
+  const activeSavedIndex = activeExistingCommentId
+    ? comments.findIndex((comment) => comment.id === activeExistingCommentId)
     : -1;
   const activePinNumber = activeSavedIndex >= 0
     ? activeSavedIndex + 1
-    : visibleComments.length + 1;
+    : comments.length + 1;
   const targetOverlay = activeTarget ?? hoveredTarget;
   return (
     <div className="comment-overlay-layer" aria-hidden={false}>
@@ -8522,6 +8524,7 @@ function HtmlViewer({
                   hoveredTarget={hoveredCommentTarget}
                   hoveredPodMemberId={hoveredPodMemberId}
                   activeTarget={activeCommentTarget}
+                  activeExistingCommentId={activeComposerComment?.id ?? null}
                   boardTool={boardTool}
                   showActivePin={commentCreateMode}
                   scale={overlayPreviewScale}

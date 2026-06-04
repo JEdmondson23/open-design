@@ -1508,7 +1508,7 @@ function AppInner() {
   }, []);
 
   const handleBack = useCallback(() => {
-    navigate({ kind: 'home', view: 'home' });
+    navigate({ kind: 'home', view: 'projects' });
   }, []);
 
   const handleClearPendingPrompt = useCallback(() => {

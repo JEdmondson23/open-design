@@ -625,11 +625,7 @@ export function HandoffButton({
                     <button
                       key={editor.id}
                       type="button"
-                      className={[
-                        'handoff-menu-item',
-                        'handoff-target-card',
-                        editor.id === preferred ? 'active' : '',
-                      ].filter(Boolean).join(' ')}
+                      className="handoff-menu-item handoff-target-card"
                       data-testid={`handoff-menu-item-${editor.id}`}
                       onClick={() => void launch(editor)}
                       disabled={busy === editor.id}
