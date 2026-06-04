@@ -788,6 +788,8 @@ export interface Dict {
   'entry.useEverywhereTitle': string;
   'entry.useEverywhereAria': string;
   // Left nav rail (icon-only) — surface labels also serve as tooltips
+  'entry.navExpand': string;
+  'entry.navCollapse': string;
   'entry.navNewProject': string;
   'entry.navHome': string;
   'entry.navProjects': string;
@@ -801,6 +803,8 @@ export interface Dict {
 
   // Entry home
   'homeHero.title': string;
+  'homeHero.templatesScrollHint': string;
+  'homeHero.templatesCollapse': string;
   'homeHero.subtitlePrefix': string;
   'homeHero.placeholder': string;
   'homeHero.placeholderActive': string;

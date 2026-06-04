@@ -407,6 +407,8 @@ export const pl: Dict = {
   'entry.loadingWorkspace': 'Ładowanie obszaru roboczego…',
   'entry.useEverywhereTitle': 'Używaj wszędzie',
   'entry.useEverywhereAria': 'Otwórz przewodnik „Używaj wszędzie” (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Rozwiń pasek boczny',
+  'entry.navCollapse': 'Zwiń pasek boczny',
   'entry.navNewProject': 'Nowy projekt',
   'entry.navHome': 'Strona główna',
   'entry.navProjects': 'Projekty',

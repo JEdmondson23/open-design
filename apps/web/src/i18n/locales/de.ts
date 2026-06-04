@@ -406,6 +406,8 @@ export const de: Dict = {
   'entry.loadingWorkspace': 'Workspace wird geladen…',
   'entry.useEverywhereTitle': 'Überall verwenden',
   'entry.useEverywhereAria': 'Anleitung „Überall verwenden“ öffnen (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Seitenleiste einblenden',
+  'entry.navCollapse': 'Seitenleiste ausblenden',
   'entry.navNewProject': 'Neues Projekt',
   'entry.navHome': 'Start',
   'entry.navProjects': 'Projekte',

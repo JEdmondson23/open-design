@@ -498,6 +498,8 @@ export const id: Dict = {
   'entry.loadingWorkspace': 'Memuat workspace...',
   'entry.useEverywhereTitle': 'Gunakan di mana saja',
   'entry.useEverywhereAria': 'Buka panduan “Gunakan di mana saja” (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Buka bilah sisi',
+  'entry.navCollapse': 'Tutup bilah sisi',
   'entry.navNewProject': 'Proyek baru',
   'entry.navHome': 'Beranda',
   'entry.navProjects': 'Proyek',

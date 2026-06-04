@@ -406,6 +406,8 @@ export const ja: Dict = {
   'entry.loadingWorkspace': 'ワークスペースを読み込み中…',
   'entry.useEverywhereTitle': 'どこでも使う',
   'entry.useEverywhereAria': '「どこでも使う」ガイドを開く（CLI、MCP、HTTP、Skills）',
+  'entry.navExpand': 'サイドバーを展開',
+  'entry.navCollapse': 'サイドバーを折りたたむ',
   'entry.navNewProject': '新規プロジェクト',
   'entry.navHome': 'ホーム',
   'entry.navProjects': 'プロジェクト',

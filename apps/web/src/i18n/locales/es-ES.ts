@@ -406,6 +406,8 @@ export const esES: Dict = {
   'entry.loadingWorkspace': 'Cargando espacio de trabajo…',
   'entry.useEverywhereTitle': 'Usar en todas partes',
   'entry.useEverywhereAria': 'Abrir la guía «Usar en todas partes» (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Mostrar barra lateral',
+  'entry.navCollapse': 'Ocultar barra lateral',
   'entry.navNewProject': 'Nuevo proyecto',
   'entry.navHome': 'Inicio',
   'entry.navProjects': 'Proyectos',

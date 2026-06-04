@@ -408,6 +408,8 @@ export const uk: Dict = {
   'entry.loadingWorkspace': 'Завантаження робочого простору…',
   'entry.useEverywhereTitle': 'Використовувати скрізь',
   'entry.useEverywhereAria': 'Відкрити довідник «Використовувати скрізь» (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Розгорнути бічну панель',
+  'entry.navCollapse': 'Згорнути бічну панель',
   'entry.navNewProject': 'Новий проєкт',
   'entry.navHome': 'Головна',
   'entry.navProjects': 'Проєкти',

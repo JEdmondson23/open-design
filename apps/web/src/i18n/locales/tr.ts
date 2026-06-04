@@ -397,6 +397,8 @@ export const tr: Dict = {
   'entry.loadingWorkspace': 'Çalışma alanı yükleniyor…',
   'entry.useEverywhereTitle': 'Her yerde kullan',
   'entry.useEverywhereAria': '“Her yerde kullan” kılavuzunu aç (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Kenar çubuğunu genişlet',
+  'entry.navCollapse': 'Kenar çubuğunu daralt',
   'entry.navNewProject': 'Yeni proje',
   'entry.navHome': 'Ana sayfa',
   'entry.navProjects': 'Projeler',

@@ -407,6 +407,8 @@ export const hu: Dict = {
   'entry.loadingWorkspace': 'Munkaterület betöltése…',
   'entry.useEverywhereTitle': 'Használat bárhol',
   'entry.useEverywhereAria': '„Használat bárhol” útmutató megnyitása (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Oldalsáv kibontása',
+  'entry.navCollapse': 'Oldalsáv összecsukása',
   'entry.navNewProject': 'Új projekt',
   'entry.navHome': 'Kezdőlap',
   'entry.navProjects': 'Projektek',

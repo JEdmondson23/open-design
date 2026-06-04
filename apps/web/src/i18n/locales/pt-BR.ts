@@ -406,6 +406,8 @@ export const ptBR: Dict = {
   'entry.loadingWorkspace': 'Carregando área de trabalho…',
   'entry.useEverywhereTitle': 'Usar em qualquer lugar',
   'entry.useEverywhereAria': 'Abrir o guia “Usar em qualquer lugar” (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Expandir barra lateral',
+  'entry.navCollapse': 'Recolher barra lateral',
   'entry.navNewProject': 'Novo projeto',
   'entry.navHome': 'Início',
   'entry.navProjects': 'Projetos',

@@ -407,6 +407,8 @@ export const ar: Dict = {
   'entry.loadingWorkspace': 'جاري تحميل مساحة العمل...',
   'entry.useEverywhereTitle': 'استخدمه في كل مكان',
   'entry.useEverywhereAria': 'افتح دليل «استخدمه في كل مكان» (CLI، MCP، HTTP، Skills)',
+  'entry.navExpand': 'توسيع الشريط الجانبي',
+  'entry.navCollapse': 'طي الشريط الجانبي',
   'entry.navNewProject': 'مشروع جديد',
   'entry.navHome': 'الرئيسية',
   'entry.navProjects': 'المشاريع',

@@ -409,6 +409,8 @@ export const fa: Dict = {
   'entry.loadingWorkspace': 'در حال بارگذاری فضای کاری…',
   'entry.useEverywhereTitle': 'استفاده در همه‌جا',
   'entry.useEverywhereAria': 'باز کردن راهنمای «استفاده در همه‌جا» (CLI، MCP، HTTP، Skills)',
+  'entry.navExpand': 'باز کردن نوار کناری',
+  'entry.navCollapse': 'جمع کردن نوار کناری',
   'entry.navNewProject': 'پروژه جدید',
   'entry.navHome': 'خانه',
   'entry.navProjects': 'پروژه‌ها',

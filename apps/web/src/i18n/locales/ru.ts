@@ -406,6 +406,8 @@ export const ru: Dict = {
   'entry.loadingWorkspace': 'Загрузка рабочего пространства…',
   'entry.useEverywhereTitle': 'Использовать везде',
   'entry.useEverywhereAria': 'Открыть руководство «Использовать везде» (CLI, MCP, HTTP, Skills)',
+  'entry.navExpand': 'Развернуть боковую панель',
+  'entry.navCollapse': 'Свернуть боковую панель',
   'entry.navNewProject': 'Новый проект',
   'entry.navHome': 'Главная',
   'entry.navProjects': 'Проекты',
