@@ -2070,6 +2070,7 @@ export function FileWorkspace({
             rootDirName={rootDirName}
             reloading={reloading}
             files={visibleFiles}
+            folders={projectFolders}
             liveArtifacts={liveArtifactEntries}
             onRefreshFiles={onRefreshFiles}
             onCurrentDirChange={setUploadDir}
