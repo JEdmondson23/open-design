@@ -190,9 +190,10 @@ describe("packaged smoke workflow", () => {
     const macX64Job = sectionBetween(workflow, "  build_mac_x64:", "  build_win_x64:");
     const prepareStep = sectionBetween(macX64Job, "      - name: Prepare mac_x64 assets", "      - name: Publish mac_x64 platform");
     const publishStep = sectionBetween(macX64Job, "      - name: Publish mac_x64 platform", "      - name: Upload mac_x64 publish manifest");
+    const artifactMode = "RELEASE_ARTIFACT_MODE: ${{ inputs.mac_x64_target == 'all' && 'all' || 'dmg-and-payload' }}";
 
-    expect(prepareStep).toContain("RELEASE_ARTIFACT_MODE: all");
-    expect(publishStep).toContain("RELEASE_ARTIFACT_MODE: all");
+    expect(prepareStep).toContain(artifactMode);
+    expect(publishStep).toContain(artifactMode);
   });
 
   it("keeps the self-hosted beta lane metadata-driven with reusable platform publish scripts", async () => {
