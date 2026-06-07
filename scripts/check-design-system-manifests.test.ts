@@ -254,8 +254,8 @@ test("design-system design tokens guard rejects stale derived JSON", async () =>
   }
 });
 
-test("design-system design tokens guard rejects stale source line references", async () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "od-design-tokens-source-guard-"));
+test("design-system design tokens guard rejects stale token source line references", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "od-design-token-source-guard-"));
   try {
     writeDerivedTokenFixture(root);
     const report = JSON.parse(readFileSync(path.join(root, REPORT_PATH), "utf8")) as {
@@ -263,7 +263,10 @@ test("design-system design tokens guard rejects stale source line references", a
       summary: unknown;
       tokens: DerivedDesignTokenBinding[];
     };
-    report.tokens[0]!.sources = ["tokens.css:1"];
+    report.tokens[0] = {
+      ...report.tokens[0]!,
+      sources: ["tokens.css:1"],
+    };
     writeFileSync(path.join(root, REPORT_PATH), `${JSON.stringify(report, null, 2)}\n`);
     writeFileSync(path.join(root, "design-tokens.json"), renderDesignTokensJson({
       bindings: report.tokens,
@@ -273,7 +276,7 @@ test("design-system design tokens guard rejects stale source line references", a
     const violations: string[] = [];
     await validateDesignTokensJson(violations, "design-systems/test/manifest.json", root, "tokens.css", "design-tokens.json", REPORT_PATH);
     assert.deepEqual(violations, [
-      "design-systems/test/manifest.json: source/token-contract.report.json token --bg source tokens.css:1 must point to a tokens.css line declaring --bg",
+      "design-systems/test/manifest.json: source/token-contract.report.json token --bg source tokens.css:1 must point to tokens.css:2",
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -301,7 +304,7 @@ test("design-system design tokens guard rejects prefix token source line referen
     const violations: string[] = [];
     await validateDesignTokensJson(violations, "design-systems/test/manifest.json", root, "tokens.css", "design-tokens.json", REPORT_PATH);
     assert.deepEqual(violations, [
-      "design-systems/test/manifest.json: source/token-contract.report.json token --fg source tokens.css:6 must point to a tokens.css line declaring --fg",
+      "design-systems/test/manifest.json: source/token-contract.report.json token --fg source tokens.css:6 must point to tokens.css:5",
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
