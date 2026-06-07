@@ -1,4 +1,4 @@
-import { chmod, lstat, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { resolveDaemonPlaywrightChromiumExecutablePath } from "../src/resources.js";
@@ -36,10 +36,7 @@ export async function ensureDaemonPlaywrightFixture(workspaceRoot: string): Prom
   const revision = revisionMatch[1];
   const headlessRoot = join(dirname(headedRoot), `chromium_headless_shell-${revision}`);
   const headlessSentinel = join(headlessRoot, "HEADLESS_SENTINEL");
-  const cleanupPaths: string[] = [];
-
   if (!(await pathExists(headedRoot))) {
-    cleanupPaths.push(headedRoot);
     await mkdir(chromeDir, { recursive: true });
     await writeFile(executablePath, "#!/bin/sh\nexit 0\n", "utf8");
     await chmod(executablePath, 0o755);
@@ -47,21 +44,18 @@ export async function ensureDaemonPlaywrightFixture(workspaceRoot: string): Prom
   }
 
   if (!(await pathExists(headlessRoot))) {
-    cleanupPaths.push(headlessRoot);
     await mkdir(headlessRoot, { recursive: true });
   }
 
   if (!(await pathExists(headlessSentinel))) {
-    cleanupPaths.push(headlessSentinel);
     await writeFile(headlessSentinel, "headless shell\n", "utf8");
   }
 
   return {
-    cleanup: async () => {
-      await Promise.all(
-        cleanupPaths.map((path) => rm(path, { force: true, recursive: true })),
-      );
-    },
+    // These tests share the daemon-resolved Playwright cache roots across
+    // multiple Vitest workers. Removing the synthetic bundle during one file's
+    // teardown can race another file that is still hashing or copying it.
+    cleanup: async () => {},
     executablePath,
     headlessSentinel,
     headedRoot,
