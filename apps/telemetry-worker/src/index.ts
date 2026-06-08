@@ -6,6 +6,9 @@ const DEFAULT_OBJECT_BATCH_MAX_BYTES = 100 * 1024 * 1024;
 const RELAY_MARKER_HEADER = 'X-Open-Design-Telemetry';
 const RELAY_MARKER_VALUE = 'langfuse-ingestion-v1';
 const OBJECT_RELAY_MARKER_VALUE = 'object-ingestion-v1';
+const OBJECT_RELAY_SIGNATURE_HEADER = 'X-Open-Design-Object-Signature';
+const OBJECT_RELAY_TIMESTAMP_HEADER = 'X-Open-Design-Object-Timestamp';
+const OBJECT_RELAY_SIGNATURE_MAX_AGE_SECONDS = 5 * 60;
 const ALLOWED_EVENT_TYPES = new Set([
   'trace-create',
   'span-create',
@@ -39,6 +42,7 @@ export interface Env {
   TRACE_OBJECT_PREFIX?: string;
   TRACE_OBJECT_MAX_BYTES?: string;
   TRACE_OBJECT_BATCH_MAX_BYTES?: string;
+  TRACE_OBJECT_UPLOAD_SECRET?: string;
   TELEMETRY_CLIENT_RATE_LIMITER?: RateLimitBinding;
   TELEMETRY_IP_RATE_LIMITER?: RateLimitBinding;
 }
@@ -66,6 +70,30 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   copy.set(bytes);
   const digest = await crypto.subtle.digest('SHA-256', copy.buffer);
   return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function timingSafeEqualHex(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return diff === 0;
+}
+
+async function hmacSha256Hex(secret: string, value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(value));
+  return [...new Uint8Array(signature)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 }
@@ -205,6 +233,18 @@ function safeObjectSegment(value: string): string {
     .join('/');
 }
 
+function expectedStorageRefPrefix(
+  projectId: string,
+  runId: string,
+  objectClass: string,
+): string | null {
+  const safeProject = safeObjectSegment(projectId);
+  const safeRun = safeObjectSegment(runId);
+  const safeClass = safeObjectSegment(objectClass);
+  if (!safeProject || !safeRun || !safeClass) return null;
+  return `od://objects/workspaces/unknown/projects/${safeProject}/runs/${safeRun}/${safeClass}/`;
+}
+
 function keyFromStorageRef(storageRef: string, prefix: string): string | null {
   const marker = 'od://objects/';
   if (!storageRef.startsWith(marker)) return null;
@@ -228,6 +268,15 @@ function decodeBase64(input: string): Uint8Array | null {
 
 function validateObjectBody(value: unknown): string | null {
   if (!isRecord(value)) return 'body must be a JSON object';
+  if (typeof value.client_id !== 'string' || value.client_id.length === 0) {
+    return 'body.client_id must be a string';
+  }
+  if (typeof value.project_id !== 'string' || value.project_id.length === 0) {
+    return 'body.project_id must be a string';
+  }
+  if (typeof value.run_id !== 'string' || value.run_id.length === 0) {
+    return 'body.run_id must be a string';
+  }
   if (!Array.isArray(value.objects)) return 'body.objects must be an array';
   if (value.objects.length === 0) return 'body.objects must not be empty';
   if (value.objects.length > 100) return 'body.objects has too many objects';
@@ -237,6 +286,20 @@ function validateObjectBody(value: unknown): string | null {
     if (typeof object.storage_ref !== 'string' || !object.storage_ref.startsWith('od://objects/')) {
       return `body.objects[${index}].storage_ref must be an od://objects reference`;
     }
+    if (
+      typeof object.object_class !== 'string' ||
+      !['attachment', 'artifact', 'input_text_snapshot'].includes(object.object_class)
+    ) {
+      return `body.objects[${index}].object_class must be an allowed object class`;
+    }
+    const expectedPrefix = expectedStorageRefPrefix(
+      value.project_id,
+      value.run_id,
+      object.object_class,
+    );
+    if (!expectedPrefix || !object.storage_ref.startsWith(expectedPrefix)) {
+      return `body.objects[${index}].storage_ref must match the project, run, and object class`;
+    }
     if (typeof object.content_base64 !== 'string' || object.content_base64.length === 0) {
       return `body.objects[${index}].content_base64 must be a string`;
     }
@@ -244,6 +307,38 @@ function validateObjectBody(value: unknown): string | null {
       return `body.objects[${index}].mime must be a string`;
     }
   }
+  return null;
+}
+
+async function verifyObjectUploadAuthority(
+  request: Request,
+  env: Env,
+  rawBody: string,
+): Promise<Response | null> {
+  const uploadSecret = env.TRACE_OBJECT_UPLOAD_SECRET?.trim();
+  if (!uploadSecret) return jsonResponse(503, { error: 'object relay upload authority is not configured' });
+
+  const timestampRaw = request.headers.get(OBJECT_RELAY_TIMESTAMP_HEADER)?.trim();
+  const signatureRaw = request.headers.get(OBJECT_RELAY_SIGNATURE_HEADER)?.trim();
+  if (!timestampRaw || !signatureRaw?.startsWith('sha256:')) {
+    return jsonResponse(403, { error: 'missing object upload authority' });
+  }
+
+  const timestamp = Number(timestampRaw);
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    !Number.isFinite(timestamp) ||
+    Math.abs(now - timestamp) > OBJECT_RELAY_SIGNATURE_MAX_AGE_SECONDS
+  ) {
+    return jsonResponse(403, { error: 'stale object upload authority' });
+  }
+
+  const expected = await hmacSha256Hex(uploadSecret, `${timestampRaw}\n${rawBody}`);
+  const supplied = signatureRaw.slice('sha256:'.length);
+  if (!/^[a-f0-9]{64}$/i.test(supplied) || !timingSafeEqualHex(expected, supplied.toLowerCase())) {
+    return jsonResponse(403, { error: 'invalid object upload authority' });
+  }
+
   return null;
 }
 
@@ -266,6 +361,9 @@ async function handleObjectBatchRequest(request: Request, env: Env): Promise<Res
   );
   const rawBody = await readBoundedBodyWithLimit(request, batchMaxBytes);
   if (rawBody instanceof Response) return rawBody;
+
+  const authorityResponse = await verifyObjectUploadAuthority(request, env, rawBody);
+  if (authorityResponse) return authorityResponse;
 
   let parsed: unknown;
   try {

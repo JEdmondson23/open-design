@@ -33,7 +33,12 @@ Rate Limiting bindings for two independent keys:
   minute.
 
 Object ingest uses the same rate limit bindings with a separate marker value,
-`X-Open-Design-Telemetry: object-ingestion-v1`. The Worker enforces a 50 MiB
+`X-Open-Design-Telemetry: object-ingestion-v1`, plus a timestamped HMAC in
+`X-Open-Design-Object-Timestamp` and `X-Open-Design-Object-Signature` signed by
+the daemon from `OPEN_DESIGN_OBJECT_UPLOAD_SECRET` and verified by the Worker
+with `TRACE_OBJECT_UPLOAD_SECRET`. The Worker also requires every
+`storage_ref` to match the signed `project_id`, `run_id`, and object class
+payload before deriving an R2 key. It enforces a 50 MiB
 single-object limit and a 100 MiB request-body limit by default. Oversized
 objects are reported as unavailable instead of being written.
 
@@ -42,6 +47,7 @@ objects are reported as unavailable instead of being written.
 ```bash
 pnpm --dir apps/telemetry-worker dlx wrangler secret put LANGFUSE_PUBLIC_KEY
 pnpm --dir apps/telemetry-worker dlx wrangler secret put LANGFUSE_SECRET_KEY
+pnpm --dir apps/telemetry-worker dlx wrangler secret put TRACE_OBJECT_UPLOAD_SECRET
 ```
 
 `LANGFUSE_BASE_URL` defaults to `https://us.cloud.langfuse.com` in

@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 import worker, { type Env } from '../src/index';
@@ -7,6 +8,7 @@ const env: Env = {
   LANGFUSE_SECRET_KEY: 'sk-lf-test',
   LANGFUSE_BASE_URL: 'https://us.cloud.langfuse.com',
 };
+const objectUploadSecret = 'object-upload-secret';
 
 function makeRequest(body: unknown): Request {
   return new Request('https://telemetry.open-design.ai/api/langfuse', {
@@ -25,7 +27,30 @@ function makeRateLimiter(success: boolean) {
   };
 }
 
+function signedObjectHeaders(bodyText: string): Record<string, string> {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  return {
+    'Content-Type': 'application/json',
+    'X-Open-Design-Telemetry': 'object-ingestion-v1',
+    'X-Open-Design-Object-Timestamp': timestamp,
+    'X-Open-Design-Object-Signature': `sha256:${createHmac('sha256', objectUploadSecret)
+      .update(timestamp)
+      .update('\n')
+      .update(bodyText)
+      .digest('hex')}`,
+  };
+}
+
 function makeObjectRequest(body: unknown): Request {
+  const bodyText = JSON.stringify(body);
+  return new Request('https://telemetry.open-design.ai/api/objects/batch', {
+    method: 'POST',
+    headers: signedObjectHeaders(bodyText),
+    body: bodyText,
+  });
+}
+
+function makeUnsignedObjectRequest(body: unknown): Request {
   return new Request('https://telemetry.open-design.ai/api/objects/batch', {
     method: 'POST',
     headers: {
@@ -169,9 +194,12 @@ describe('telemetry worker', () => {
     const response = await worker.fetch(
       makeObjectRequest({
         client_id: 'installation-1',
+        project_id: 'proj-1',
+        run_id: 'run-1',
         objects: [
           {
-            storage_ref: 'od://objects/projects/proj-1/runs/run-1/attachment/att-1/brief.txt',
+            storage_ref: 'od://objects/workspaces/unknown/projects/proj-1/runs/run-1/attachment/att-1/brief.txt',
+            object_class: 'attachment',
             mime: 'text/plain',
             content_base64: base64('hello object'),
           },
@@ -181,6 +209,7 @@ describe('telemetry worker', () => {
         ...env,
         TRACE_OBJECT_BUCKET: { put },
         TRACE_OBJECT_PREFIX: 'observability',
+        TRACE_OBJECT_UPLOAD_SECRET: objectUploadSecret,
       },
     );
 
@@ -189,11 +218,11 @@ describe('telemetry worker', () => {
     expect(put).toHaveBeenCalledTimes(1);
     const putCalls = (put as unknown as { mock: { calls: unknown[][] } }).mock.calls;
     expect(putCalls[0]![0]).toBe(
-      'observability/projects/proj-1/runs/run-1/attachment/att-1/brief.txt',
+      'observability/workspaces/unknown/projects/proj-1/runs/run-1/attachment/att-1/brief.txt',
     );
     const body = await response.json() as { objects: Array<Record<string, unknown>> };
     expect(body.objects[0]).toMatchObject({
-      storage_ref: 'od://objects/projects/proj-1/runs/run-1/attachment/att-1/brief.txt',
+      storage_ref: 'od://objects/workspaces/unknown/projects/proj-1/runs/run-1/attachment/att-1/brief.txt',
       status: 'available',
       size_bytes: 12,
     });
@@ -215,13 +244,74 @@ describe('telemetry worker', () => {
     expect(response.status).toBe(403);
   });
 
+  it('rejects marker-only object batches without upload authority', async () => {
+    const put = vi.fn(async () => ({}));
+    const response = await worker.fetch(
+      makeUnsignedObjectRequest({
+        client_id: 'installation-1',
+        project_id: 'proj-1',
+        run_id: 'run-1',
+        objects: [
+          {
+            storage_ref: 'od://objects/workspaces/unknown/projects/proj-1/runs/run-1/attachment/att-1/brief.txt',
+            object_class: 'attachment',
+            mime: 'text/plain',
+            content_base64: base64('hello object'),
+          },
+        ],
+      }),
+      {
+        ...env,
+        TRACE_OBJECT_BUCKET: { put },
+        TRACE_OBJECT_UPLOAD_SECRET: objectUploadSecret,
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('rejects object refs outside the signed project and run namespace', async () => {
+    const put = vi.fn(async () => ({}));
+    const response = await worker.fetch(
+      makeObjectRequest({
+        client_id: 'installation-1',
+        project_id: 'proj-1',
+        run_id: 'run-1',
+        objects: [
+          {
+            storage_ref: 'od://objects/workspaces/unknown/projects/proj-2/runs/run-1/attachment/att-1/brief.txt',
+            object_class: 'attachment',
+            mime: 'text/plain',
+            content_base64: base64('hello object'),
+          },
+        ],
+      }),
+      {
+        ...env,
+        TRACE_OBJECT_BUCKET: { put },
+        TRACE_OBJECT_UPLOAD_SECRET: objectUploadSecret,
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'body.objects[0].storage_ref must match the project, run, and object class',
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it('reports oversized objects without writing them', async () => {
     const put = vi.fn(async () => ({}));
     const response = await worker.fetch(
       makeObjectRequest({
+        client_id: 'installation-1',
+        project_id: 'proj-1',
+        run_id: 'run-1',
         objects: [
           {
-            storage_ref: 'od://objects/projects/proj-1/runs/run-1/artifact/art-1/index.html',
+            storage_ref: 'od://objects/workspaces/unknown/projects/proj-1/runs/run-1/artifact/art-1/index.html',
+            object_class: 'artifact',
             mime: 'text/html',
             content_base64: base64('too large'),
           },
@@ -231,6 +321,7 @@ describe('telemetry worker', () => {
         ...env,
         TRACE_OBJECT_BUCKET: { put },
         TRACE_OBJECT_MAX_BYTES: '4',
+        TRACE_OBJECT_UPLOAD_SECRET: objectUploadSecret,
       },
     );
 
@@ -239,7 +330,7 @@ describe('telemetry worker', () => {
     expect(await response.json()).toEqual({
       objects: [
         {
-          storage_ref: 'od://objects/projects/proj-1/runs/run-1/artifact/art-1/index.html',
+          storage_ref: 'od://objects/workspaces/unknown/projects/proj-1/runs/run-1/artifact/art-1/index.html',
           status: 'unavailable',
           reason: 'object_too_large',
           size_bytes: 9,

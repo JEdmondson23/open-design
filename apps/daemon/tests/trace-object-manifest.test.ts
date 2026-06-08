@@ -26,6 +26,11 @@ describe('buildTraceObjectManifests', () => {
 
     const fetchSpy = vi.fn(async (_url: string, init: RequestInit) => {
       const body = init.body as string;
+      expect(init.headers).toMatchObject({
+        'X-Open-Design-Telemetry': 'object-ingestion-v1',
+        'X-Open-Design-Object-Signature': expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        'X-Open-Design-Object-Timestamp': expect.stringMatching(/^\d+$/),
+      });
       expect(Buffer.byteLength(body, 'utf8')).toBeLessThanOrEqual(2300);
       const parsed = JSON.parse(body) as {
         objects: Array<{ storage_ref: string; content_base64: string }>;
@@ -58,6 +63,7 @@ describe('buildTraceObjectManifests', () => {
       fetchImpl: fetchSpy as any,
       env: {
         OPEN_DESIGN_OBJECT_RELAY_URL: 'https://telemetry.open-design.ai/api/objects/batch',
+        OPEN_DESIGN_OBJECT_UPLOAD_SECRET: 'object-upload-secret',
         OPEN_DESIGN_OBJECT_MAX_BYTES: '1024',
         OPEN_DESIGN_OBJECT_BATCH_MAX_BYTES: '2300',
       },
@@ -132,6 +138,7 @@ describe('buildTraceObjectManifests', () => {
       fetchImpl: fetchSpy as any,
       env: {
         OPEN_DESIGN_OBJECT_RELAY_URL: 'https://telemetry.open-design.ai/api/objects/batch',
+        OPEN_DESIGN_OBJECT_UPLOAD_SECRET: 'object-upload-secret',
       },
       now: () => new Date('2026-06-08T00:00:00.000Z'),
     });
@@ -190,6 +197,7 @@ describe('buildTraceObjectManifests', () => {
       fetchImpl: fetchSpy as any,
       env: {
         OPEN_DESIGN_OBJECT_RELAY_URL: 'https://telemetry.open-design.ai/api/objects/batch',
+        OPEN_DESIGN_OBJECT_UPLOAD_SECRET: 'object-upload-secret',
       },
       now: () => new Date('2026-06-08T00:00:00.000Z'),
     });

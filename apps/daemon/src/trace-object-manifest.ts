@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import path from 'node:path';
 
 import type {
@@ -13,6 +13,8 @@ import { mimeFor, readProjectFile } from './projects.js';
 
 const OBJECT_RELAY_MARKER_HEADER = 'X-Open-Design-Telemetry';
 const OBJECT_RELAY_MARKER_VALUE = 'object-ingestion-v1';
+const OBJECT_RELAY_SIGNATURE_HEADER = 'X-Open-Design-Object-Signature';
+const OBJECT_RELAY_TIMESTAMP_HEADER = 'X-Open-Design-Object-Timestamp';
 const DEFAULT_RETENTION_DAYS = 90;
 const DEFAULT_OBJECT_MAX_BYTES = 50 * 1024 * 1024;
 const DEFAULT_OBJECT_BATCH_MAX_BYTES = 100 * 1024 * 1024;
@@ -70,6 +72,7 @@ export interface TraceArtifactObjectSource {
 
 interface ObjectRelayConfig {
   url: string;
+  uploadSecret: string;
   timeoutMs: number;
   objectMaxBytes: number;
   objectBatchMaxBytes: number;
@@ -145,8 +148,11 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 function readRelayConfig(env: NodeJS.ProcessEnv): ObjectRelayConfig | null {
   const url = inferRelayUrl(env);
   if (!url) return null;
+  const uploadSecret = env.OPEN_DESIGN_OBJECT_UPLOAD_SECRET?.trim();
+  if (!uploadSecret) return null;
   return {
     url,
+    uploadSecret,
     timeoutMs: parsePositiveInt(
       env.OPEN_DESIGN_OBJECT_RELAY_TIMEOUT_MS ?? env.OPEN_DESIGN_TELEMETRY_TIMEOUT_MS,
       10_000,
@@ -160,6 +166,14 @@ function readRelayConfig(env: NodeJS.ProcessEnv): ObjectRelayConfig | null {
       DEFAULT_OBJECT_BATCH_MAX_BYTES,
     ),
   };
+}
+
+function signObjectBatch(uploadSecret: string, timestamp: string, body: string): string {
+  return `sha256:${createHmac('sha256', uploadSecret)
+    .update(timestamp)
+    .update('\n')
+    .update(body)
+    .digest('hex')}`;
 }
 
 function extensionFromName(value: string): string | undefined {
@@ -284,6 +298,8 @@ async function postObjects(
   objects: ObjectRelayRequestObject[],
 ): Promise<RelayResult[]> {
   const body = buildObjectBatchBody(opts, objects);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = signObjectBatch(config.uploadSecret, timestamp, body);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
   try {
@@ -293,6 +309,8 @@ async function postObjects(
       headers: {
         'Content-Type': 'application/json',
         [OBJECT_RELAY_MARKER_HEADER]: OBJECT_RELAY_MARKER_VALUE,
+        [OBJECT_RELAY_SIGNATURE_HEADER]: signature,
+        [OBJECT_RELAY_TIMESTAMP_HEADER]: timestamp,
       },
       body,
       signal: controller.signal,
