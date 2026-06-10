@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
   type AppDirectoryRegistry,
   collectCrossAppImportViolationsFromSource,
   isCrossAppImportSourceFile,
+  loadAppDirectoryRegistry,
 } from "./check-cross-app-imports.ts";
 
 const registry: AppDirectoryRegistry = {
@@ -137,4 +141,23 @@ test("cross-app import check ignores files outside apps/", () => {
   );
 
   assert.deepEqual(violations, []);
+});
+
+test("app registry loading fails loudly when an app manifest is malformed", async () => {
+  const appsRoot = await mkdtemp(path.join(os.tmpdir(), "open-design-apps-"));
+  const appRoot = path.join(appsRoot, "web");
+  const manifestPath = path.join(appRoot, "package.json");
+
+  await mkdir(appRoot);
+  await writeFile(manifestPath, "{ invalid json", "utf8");
+
+  await assert.rejects(
+    loadAppDirectoryRegistry(appsRoot),
+    (error) =>
+      error instanceof Error &&
+      error.message.includes(`Failed to load app package manifest at ${manifestPath}:`) &&
+      error.message.includes("JSON"),
+  );
+
+  await rm(appsRoot, { force: true, recursive: true });
 });

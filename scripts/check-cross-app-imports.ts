@@ -207,8 +207,9 @@ export function collectCrossAppImportViolationsFromSource(
   return violations.sort((left, right) => left.lineNumber - right.lineNumber);
 }
 
-async function loadAppDirectoryRegistry(): Promise<AppDirectoryRegistry> {
-  const appsRoot = path.join(repoRoot, "apps");
+export async function loadAppDirectoryRegistry(
+  appsRoot = path.join(repoRoot, "apps"),
+): Promise<AppDirectoryRegistry> {
   const packageNameByDirectory = new Map<string, string>();
 
   for (const entry of await readdir(appsRoot, { withFileTypes: true })) {
@@ -218,8 +219,9 @@ async function loadAppDirectoryRegistry(): Promise<AppDirectoryRegistry> {
     let manifest: { name?: unknown };
     try {
       manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { name?: unknown };
-    } catch {
-      continue;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to load app package manifest at ${manifestPath}: ${reason}`);
     }
 
     if (typeof manifest.name === "string" && manifest.name.length > 0) {
