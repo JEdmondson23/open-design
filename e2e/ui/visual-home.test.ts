@@ -201,7 +201,10 @@ test('[P2] captures the home plugin use with query surface', async ({ page }) =>
   // Community gallery tiles carry no inline Use actions — use-with-query
   // lives behind the detail modal's split Use button.
   await home.getByTestId('plugins-home-details-visual-deck-writer').click({ force: true });
-  await expect(page.getByRole('dialog', { name: /Deck Writer details/i })).toBeVisible();
+  // Deck Writer ships a previewEntry, so its detail surface is the
+  // PreviewModal (aria-label "Deck Writer preview"), not the scenario
+  // detail's "... details" dialog. Match on the plugin name only.
+  await expect(page.getByRole('dialog', { name: /Deck Writer/i })).toBeVisible();
   await page.getByTestId('plugin-details-use-visual-deck-writer-menu').click();
   await page.getByTestId('plugin-details-use-with-query-visual-deck-writer').click();
   // use-with-query now seeds the rendered preset text (placeholders filled in),
