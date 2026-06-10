@@ -1,20 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '../i18n';
+import type { Dict } from '../i18n/types';
 import { useAnalytics } from '../analytics/provider';
 import { trackNextStepActionClick } from '../analytics/events';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import {
+  DESIGN_TOOLBOX_ACTIONS,
   FEATURED_DESIGN_TOOLBOX_ACTION_IDS,
   designToolboxActionBadge,
   designToolboxActionDescription,
   designToolboxActionTitle,
   getDesignToolboxAction,
   skillMatchesQuery,
+  type DesignToolboxAction,
   type DesignToolboxActionId,
 } from '../runtime/design-toolbox';
 import type { SkillSummary } from '../types';
 import styles from './NextStepActions.module.css';
+
+type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
+
+// Surfaced under More → Design toolbox. The two featured ids already have their
+// own rows at the top of the card, so we drop them here to avoid duplicating
+// the same action one level down.
+const NON_FEATURED_TOOLBOX_ACTIONS = DESIGN_TOOLBOX_ACTIONS.filter(
+  (action) => !FEATURED_DESIGN_TOOLBOX_ACTION_IDS.includes(action.id),
+);
 
 interface Props {
   // The previewable artifact this affordance is anchored to. Passed back to
@@ -27,10 +39,11 @@ interface Props {
   // Seed the composer with a featured design-toolbox action (matched skill +
   // prompt). Does NOT auto-send — the composer draft waits for the user.
   onToolboxAction?: (id: DesignToolboxActionId) => void;
-  // Seed the composer with a specific skill picked from the full list.
+  // Seed the composer with a specific global skill resource picked from the toolbox.
   onPickSkill?: (skillId: string) => void;
-  // The full design-toolbox skill catalogue, surfaced under More → Design toolbox.
-  // Filtered with the canonical skillMatchesQuery (triggers/mode/surface aware).
+  // Available global skill resources. The full composer toolbox also includes
+  // MCP/plugins/connectors/files; this next-step flyout keeps the same shape
+  // while using the resource data already owned by the chat pane.
   skills?: SkillSummary[];
   // Resolved `@skill` names per featured action, shown in the hover detail.
   toolboxSkillNames?: Partial<Record<DesignToolboxActionId, string | null>>;
@@ -43,13 +56,17 @@ const FLYOUT_GAP = 8;
 const VIEWPORT_MARGIN = 8;
 const DETAIL_WIDTH = 240;
 const MENU_WIDTH = 200;
-const SKILLS_WIDTH = 260;
 // Conservative heights used to keep a flyout on-screen vertically (over-estimating
-// only shifts it further up, which is always safe). The skills flyout caps at the
-// CSS max-height (360) plus its search row.
+// only shifts it further up, which is always safe).
 const DETAIL_HEIGHT = 180;
 const MENU_HEIGHT = 150;
-const SKILLS_HEIGHT = 400;
+// The Design toolbox submenu mirrors the plus-menu panel: title/search,
+// follow-up actions, and global resources.
+const TOOLBOX_SUB_WIDTH = 300;
+const TOOLBOX_SUB_HEIGHT = 500;
+// Give users enough time to cross the small gap between flyout levels without
+// making dismissal feel sticky once the pointer leaves the whole affordance.
+const FLYOUT_CLOSE_DELAY_MS = 240;
 
 // Place a flyout next to an anchor rect: flip to the left when the right edge
 // would overflow, and clamp vertically so a tall flyout under a row near the
@@ -71,7 +88,7 @@ function place(
 }
 
 type Anchor = { left: number; top: number };
-type SubKind = 'skills' | 'share';
+type SubKind = 'toolbox' | 'share';
 
 export function NextStepActions({
   fileName,
@@ -79,7 +96,7 @@ export function NextStepActions({
   onDownload,
   onToolboxAction,
   onPickSkill,
-  skills,
+  skills = [],
   toolboxSkillNames,
   onShareToOpenDesign,
   shareToOpenDesignBusy = false,
@@ -101,14 +118,14 @@ export function NextStepActions({
   // positioning so the narrow chat column never clips or occludes them:
   //   featured row  → detail card (skill summary)
   //   More          → [Design toolbox, Share]   (level 2)
-  //   Design toolbox → all skills               (level 3)
+  //   Design toolbox → search + non-featured actions + global resources (level 3)
   //   Share          → Share / Download / Contribute (level 3)
   // A single close timer with hover-intent keeps the whole path open while the
   // cursor travels between levels; entering any panel cancels the pending close.
   const [detail, setDetail] = useState<{ id: DesignToolboxActionId } & Anchor | null>(null);
   const [more, setMore] = useState<Anchor | null>(null);
   const [sub, setSub] = useState<({ kind: SubKind } & Anchor) | null>(null);
-  const [skillQuery, setSkillQuery] = useState('');
+  const [toolboxQuery, setToolboxQuery] = useState('');
 
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelClose = useCallback(() => {
@@ -127,7 +144,7 @@ export function NextStepActions({
     closeTimer.current = setTimeout(() => {
       closeAll();
       closeTimer.current = null;
-    }, 160);
+    }, FLYOUT_CLOSE_DELAY_MS);
   }, [cancelClose, closeAll]);
   useEffect(() => () => cancelClose(), [cancelClose]);
 
@@ -152,12 +169,14 @@ export function NextStepActions({
   const openSub = useCallback(
     (kind: SubKind, rect: DOMRect) => {
       cancelClose();
-      if (kind === 'skills') setSkillQuery('');
+      if (kind === 'toolbox') setToolboxQuery('');
       setSub({
         kind,
-        ...(kind === 'skills'
-          ? place(rect, SKILLS_WIDTH, SKILLS_HEIGHT)
-          : place(rect, MENU_WIDTH, MENU_HEIGHT)),
+        ...place(
+          rect,
+          kind === 'toolbox' ? TOOLBOX_SUB_WIDTH : MENU_WIDTH,
+          kind === 'toolbox' ? TOOLBOX_SUB_HEIGHT : MENU_HEIGHT,
+        ),
       });
     },
     [cancelClose],
@@ -214,13 +233,20 @@ export function NextStepActions({
     [closeAll, onPickSkill, track],
   );
 
-  const filteredSkills = useMemo(
-    // Use the canonical toolbox matcher so More → Design toolbox surfaces the
-    // same skills the composer's toolbox panel does (it also matches trigger
-    // terms, mode, and surface metadata — not just name/id/description).
-    () => (skills ?? []).filter((s) => skillMatchesQuery(s, skillQuery)),
-    [skills, skillQuery],
+  const visibleToolboxActions = useMemo(
+    () =>
+      NON_FEATURED_TOOLBOX_ACTIONS.filter((action) =>
+        designToolboxActionMatchesQuery(action, toolboxQuery, t),
+      ),
+    [toolboxQuery, t],
   );
+
+  const visibleToolboxResources = useMemo(() => {
+    const source = toolboxQuery
+      ? skills.filter((skill) => skillMatchesQuery(skill, toolboxQuery))
+      : defaultToolboxSkillResources(NON_FEATURED_TOOLBOX_ACTIONS, skills);
+    return source.slice(0, toolboxQuery ? 14 : 8);
+  }, [skills, toolboxQuery]);
 
   // Share group is available whenever any of its three actions can fire.
   const canShare = !!(fileName && onShare);
@@ -320,10 +346,10 @@ export function NextStepActions({
                 <button
                   type="button"
                   className={styles.flyoutRow}
-                  data-testid="next-step-more-skills"
-                  aria-expanded={sub?.kind === 'skills'}
-                  onMouseEnter={(e) => openSub('skills', e.currentTarget.getBoundingClientRect())}
-                  onClick={(e) => openSub('skills', e.currentTarget.getBoundingClientRect())}
+                  data-testid="next-step-more-toolbox"
+                  aria-expanded={sub?.kind === 'toolbox'}
+                  onMouseEnter={(e) => openSub('toolbox', e.currentTarget.getBoundingClientRect())}
+                  onClick={(e) => openSub('toolbox', e.currentTarget.getBoundingClientRect())}
                 >
                   <Icon name="lightbulb" size={14} className={styles.toolboxRowIcon} />
                   <span className={styles.toolboxRowTitle}>{t('chat.designToolbox.title')}</span>
@@ -349,40 +375,71 @@ export function NextStepActions({
           )
         : null}
 
-      {/* Level 3a: all skills */}
-      {sub?.kind === 'skills' && typeof document !== 'undefined'
+      {/* Level 3a: search + non-featured toolbox actions + global resources */}
+      {sub?.kind === 'toolbox' && typeof document !== 'undefined'
         ? createPortal(
             <div
-              className={`${styles.flyout} ${styles.flyoutSkills}`}
+              className={`${styles.flyout} ${styles.flyoutToolbox}`}
               role="menu"
-              data-testid="next-step-skills-list"
+              data-testid="next-step-toolbox-actions"
               style={{ left: sub.left, top: sub.top }}
               {...keepOpen}
             >
+              <div className={styles.toolboxFlyoutTitle}>
+                <Icon name="lightbulb" size={14} />
+                <span>{t('chat.designToolbox.title')}</span>
+              </div>
               <div className={styles.flyoutSearch}>
                 <Icon name="search" size={13} />
                 <input
-                  value={skillQuery}
-                  onChange={(e) => setSkillQuery(e.currentTarget.value)}
+                  value={toolboxQuery}
+                  onChange={(e) => setToolboxQuery(e.currentTarget.value)}
                   placeholder={t('chat.designToolbox.searchPlaceholder')}
                   aria-label={t('chat.designToolbox.searchAria')}
                 />
               </div>
               <div className={styles.flyoutScroll}>
-                {filteredSkills.length === 0 ? (
-                  <div className={styles.flyoutEmpty}>{t('chat.designToolbox.noResources')}</div>
-                ) : (
-                  filteredSkills.map((skill) => (
-                    <button
-                      key={skill.id}
-                      type="button"
-                      className={styles.flyoutRow}
-                      onClick={() => handlePickSkill(skill.id)}
-                    >
-                      <span className={styles.toolboxRowTitle}>{skill.name}</span>
-                    </button>
-                  ))
-                )}
+                {visibleToolboxActions.length > 0 ? (
+                  <div className={styles.flyoutSectionLabel}>
+                    {t('chat.designToolbox.followupSection')}
+                  </div>
+                ) : null}
+                {visibleToolboxActions.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    className={styles.flyoutRow}
+                    data-testid={`next-step-toolbox-sub-action-${action.id}`}
+                    onClick={() => handleToolboxAction(action.id)}
+                  >
+                    <Icon name={action.icon} size={14} className={styles.toolboxRowIcon} />
+                    <span className={styles.toolboxRowTitle}>
+                      {designToolboxActionTitle(action, t)}
+                    </span>
+                  </button>
+                ))}
+                {visibleToolboxResources.length > 0 ? (
+                  <div className={styles.flyoutSectionLabel}>
+                    {t('chat.designToolbox.resourcesSection')}
+                  </div>
+                ) : null}
+                {visibleToolboxResources.map((skill) => (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    className={styles.flyoutRow}
+                    data-testid={`next-step-toolbox-resource-${skill.id}`}
+                    onClick={() => handlePickSkill(skill.id)}
+                  >
+                    <Icon name={designToolboxSkillIcon(skill)} size={14} className={styles.toolboxRowIcon} />
+                    <span className={styles.toolboxRowTitle}>{skill.name}</span>
+                  </button>
+                ))}
+                {visibleToolboxActions.length === 0 && visibleToolboxResources.length === 0 ? (
+                  <div className={styles.flyoutEmpty}>
+                    {t('chat.designToolbox.noResources', { query: toolboxQuery })}
+                  </div>
+                ) : null}
               </div>
             </div>,
             document.body,
@@ -443,4 +500,57 @@ export function NextStepActions({
         : null}
     </div>
   );
+}
+
+function designToolboxActionMatchesQuery(
+  action: DesignToolboxAction,
+  query: string,
+  t: TranslateFn,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    action.id,
+    designToolboxActionTitle(action, t),
+    designToolboxActionDescription(action, t),
+    designToolboxActionBadge(action, t),
+    ...action.searchTerms,
+  ].join(' ').toLowerCase().includes(q);
+}
+
+function defaultToolboxSkillResources(
+  actions: DesignToolboxAction[],
+  skills: SkillSummary[],
+): SkillSummary[] {
+  const out: SkillSummary[] = [];
+  const seen = new Set<string>();
+  const add = (skill: SkillSummary | null | undefined) => {
+    if (!skill || seen.has(skill.id)) return;
+    seen.add(skill.id);
+    out.push(skill);
+  };
+
+  add(skills.find((skill) => skill.id === 'creative-director'));
+  for (const action of actions) {
+    add(
+      skills.find((skill) =>
+        action.preferredSkillIds.some((id) => skill.id === id || skill.name === id),
+      ),
+    );
+  }
+  for (const term of ['design', 'image', 'video', 'motion', 'figma']) {
+    for (const skill of skills) {
+      if (out.length >= 8) return out;
+      if (skillMatchesQuery(skill, term)) add(skill);
+    }
+  }
+  return out;
+}
+
+function designToolboxSkillIcon(skill: SkillSummary): IconName {
+  if (skill.mode === 'video' || skill.category === 'video-generation') return 'play';
+  if (skill.mode === 'image' || skill.category === 'image-generation') return 'image';
+  if (skill.category === 'animation-motion') return 'sliders';
+  if (skill.category === 'creative-direction') return 'sparkles';
+  return 'file';
 }
