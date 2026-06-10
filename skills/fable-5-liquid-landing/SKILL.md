@@ -47,8 +47,8 @@ od:
 # Fable 5 Liquid Glass Landing
 
 Produce a premium dark single-page marketing site with liquid-glass chrome, a
-full-screen looping video hero, and seven scroll sections. The bundled `example.html`
-is the reference implementation (React build); `assets/template.html` is the
+full-screen looping video hero, and scroll-driven sections. The bundled
+`example.html` is a self-contained preview demo; `assets/template.html` is the
 customizable HTML seed agents copy to `index.html`.
 
 ## Resource map
@@ -56,12 +56,10 @@ customizable HTML seed agents copy to `index.html`.
 ```text
 fable-5-liquid-landing/
 ├── SKILL.md
-├── example.html              # full demo (loads ./assets/app.js)
+├── example.html              # self-contained preview demo
 ├── open-design.png           # Open Design logo asset
 ├── assets/
-│   ├── template.html         # seed → copy to index.html
-│   ├── app.js                # reference bundle (optional)
-│   └── index.css
+│   └── template.html         # seed → copy to index.html
 └── references/
     └── checklist.md
 ```
@@ -74,8 +72,10 @@ fable-5-liquid-landing/
    `{{PLACEHOLDER}}` tokens and section copy. Keep liquid-glass CSS and FadingVideo
    logic intact.
 3. **Full path (React):** Scaffold Vite + React 18 + TypeScript + Tailwind 3 +
-   framer-motion + lucide-react. Reuse the design tokens from `assets/index.css`
-   and structure from `example.html`. Ship with `base: './'` and CDN video URLs.
+   framer-motion + lucide-react. Reuse the design tokens from `example.html` /
+   `assets/template.html` and ship with `base: './'` and CDN video URLs. Do not
+   commit bundled `.js` into the skill directory — Open Design guard rejects
+   residual JavaScript under `skills/`.
 4. Preserve interaction patterns:
    - `FadingVideo`: rAF crossfade (500ms), manual loop, no CSS opacity transitions
    - `SpotlightCard`: mouse-following radial highlight + hover lift

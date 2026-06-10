@@ -3,7 +3,8 @@
 ## P0
 
 - `assets/template.html` exists and opens directly from disk without a build step.
-- `example.html` renders the full React-built demo in an iframe (`./assets/app.js` + `./assets/index.css`).
+- `example.html` is self-contained (inline CSS + script) and renders in an iframe without a build step.
+- No bundled `.js` files under `skills/` — `pnpm guard` rejects residual JavaScript.
 - SKILL frontmatter uses `od.mode: template`, `od.scenario: marketing`, and `od.outputs.primary: index.html`.
 - Liquid-glass UI: `.liquid-glass` with backdrop blur and gradient border mask.
 - Hero uses full-screen looping video with rAF crossfade (`FadingVideo` pattern), not CSS opacity transitions on `<video>`.
