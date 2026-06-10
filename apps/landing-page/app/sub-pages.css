@@ -2462,8 +2462,14 @@ dialog.tpl-share-popover .detail-share-dialog-text {
   padding-left: 0;
   max-width: 70ch;
 }
-.solution-page .info-section ul li,
-.solution-page .info-section ol li {
+/* The coral dash / number markers are only for plain prose lists. Components
+ * that ship their own layout and numbering — the FAQ (.faq-list), the how-to
+ * steps (.solution-steps), and the template / system galleries
+ * (.solution-tpl-grid / .solution-system-grid) — keep the list-style reset
+ * above but opt OUT of the marker + indent below, so they don't get a
+ * duplicate coral counter or a stray dash shifting their cards. */
+.solution-page .info-section ul:not(.solution-tpl-grid):not(.solution-system-grid) li,
+.solution-page .info-section ol:not(.faq-list):not(.solution-steps) li {
   position: relative;
   padding-left: 1.4em;
   margin-bottom: 10px;
@@ -2471,21 +2477,21 @@ dialog.tpl-share-popover .detail-share-dialog-text {
   line-height: 1.7;
   color: var(--ink-soft);
 }
-.solution-page .info-section ul li::before {
+.solution-page .info-section ul:not(.solution-tpl-grid):not(.solution-system-grid) li::before {
   content: "—";
   position: absolute;
   left: 0;
   color: var(--coral);
 }
-/* Ordered lists keep their number, coral, in a monospace marker. */
-.solution-page .info-section ol {
+/* Ordered prose lists keep their number, coral, in a monospace marker. */
+.solution-page .info-section ol:not(.faq-list):not(.solution-steps) {
   counter-reset: agent-ol;
 }
-.solution-page .info-section ol li {
+.solution-page .info-section ol:not(.faq-list):not(.solution-steps) li {
   padding-left: 1.9em;
   counter-increment: agent-ol;
 }
-.solution-page .info-section ol li::before {
+.solution-page .info-section ol:not(.faq-list):not(.solution-steps) li::before {
   content: counter(agent-ol) ".";
   position: absolute;
   left: 0;
