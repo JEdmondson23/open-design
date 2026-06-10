@@ -103,6 +103,34 @@ export function designToolboxActionDescription(action: DesignToolboxAction, t: T
   return t(`chat.designToolbox.action.${action.id}.description` as keyof Dict);
 }
 
+// Shared matcher for the Design toolbox action rows, used by both the composer
+// panel and the next-step card so the two surfaces filter identically. `skill`
+// is the action's matched skill (see findDesignToolboxSkill); threading it in
+// means searching by a preferred skill's id/name/description/category keeps the
+// action row visible alongside its resource row, instead of the two disagreeing.
+export function designToolboxActionMatchesQuery(
+  action: DesignToolboxAction,
+  query: string,
+  skill: SkillSummary | null,
+  t: TranslateFn,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    designToolboxActionTitle(action, t),
+    designToolboxActionBadge(action, t),
+    designToolboxActionDescription(action, t),
+    ...action.searchTerms,
+    skill?.id ?? '',
+    skill?.name ?? '',
+    skill?.description ?? '',
+    skill?.category ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(q);
+}
+
 export function skillMatchesQuery(skill: SkillSummary, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;

@@ -135,6 +135,22 @@ describe('NextStepActions', () => {
     expect(within(list).queryByText(MOTION_TITLE)).toBeNull();
   });
 
+  it('keeps an action visible when searching by its preferred skill id (parity with the composer matcher)', () => {
+    renderActions();
+    fireEvent.mouseEnter(screen.getByTestId('next-step-toolbox-more'));
+    fireEvent.mouseEnter(screen.getByTestId('next-step-more-toolbox'));
+    const list = screen.getByTestId('next-step-toolbox-actions');
+
+    // `emilkowalski-motion` is the preferred skill of the `motion` action.
+    fireEvent.change(within(list).getByRole('textbox'), { target: { value: 'emilkowalski-motion' } });
+
+    // The skill resource row matches by id...
+    expect(within(list).getByTestId('next-step-toolbox-resource-emilkowalski-motion')).toBeTruthy();
+    // ...and the action it is the preferred skill for must stay visible too,
+    // instead of the action row disappearing while its resource row shows.
+    expect(within(list).getByTestId('next-step-toolbox-sub-action-motion')).toBeTruthy();
+  });
+
   it('seeds the composer with a non-featured action id when picked from the submenu', () => {
     const h = renderActions();
     fireEvent.mouseEnter(screen.getByTestId('next-step-toolbox-more'));

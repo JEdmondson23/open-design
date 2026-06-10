@@ -10,7 +10,9 @@ import {
   FEATURED_DESIGN_TOOLBOX_ACTION_IDS,
   designToolboxActionBadge,
   designToolboxActionDescription,
+  designToolboxActionMatchesQuery,
   designToolboxActionTitle,
+  findDesignToolboxSkill,
   getDesignToolboxAction,
   skillMatchesQuery,
   type DesignToolboxAction,
@@ -236,9 +238,9 @@ export function NextStepActions({
   const visibleToolboxActions = useMemo(
     () =>
       NON_FEATURED_TOOLBOX_ACTIONS.filter((action) =>
-        designToolboxActionMatchesQuery(action, toolboxQuery, t),
+        designToolboxActionMatchesQuery(action, toolboxQuery, findDesignToolboxSkill(action, skills), t),
       ),
-    [toolboxQuery, t],
+    [toolboxQuery, skills, t],
   );
 
   const visibleToolboxResources = useMemo(() => {
@@ -500,22 +502,6 @@ export function NextStepActions({
         : null}
     </div>
   );
-}
-
-function designToolboxActionMatchesQuery(
-  action: DesignToolboxAction,
-  query: string,
-  t: TranslateFn,
-): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return [
-    action.id,
-    designToolboxActionTitle(action, t),
-    designToolboxActionDescription(action, t),
-    designToolboxActionBadge(action, t),
-    ...action.searchTerms,
-  ].join(' ').toLowerCase().includes(q);
 }
 
 function defaultToolboxSkillResources(
