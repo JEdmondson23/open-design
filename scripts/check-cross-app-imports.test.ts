@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   type AppDirectoryRegistry,
   collectCrossAppImportViolationsFromSource,
+  isCrossAppImportSourceFile,
 } from "./check-cross-app-imports.ts";
 
 const registry: AppDirectoryRegistry = {
@@ -43,6 +44,24 @@ test("cross-app import check rejects another app's package name", () => {
   assert.ok(violations.every((violation) => violation.targetApp === "daemon"));
 });
 
+test("cross-app import check rejects cross-app imports from app-owned mjs entrypoints", () => {
+  assert.equal(isCrossAppImportSourceFile("entry.js"), true);
+  assert.equal(isCrossAppImportSourceFile("entry.cjs"), true);
+  assert.equal(isCrossAppImportSourceFile("postcss.config.mjs"), true);
+  assert.equal(isCrossAppImportSourceFile("types.d.ts"), true);
+  assert.equal(isCrossAppImportSourceFile("package.json"), false);
+
+  const violations = collectCrossAppImportViolationsFromSource(
+    "apps/web/postcss.config.mjs",
+    "import { startDaemon } from '@open-design/daemon/src/server.ts';",
+    registry,
+  );
+
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.targetApp, "daemon");
+  assert.equal(violations[0]?.lineNumber, 1);
+});
+
 test("cross-app import check rejects export-from and apps/ rooted specifiers", () => {
   const violations = collectCrossAppImportViolationsFromSource(
     "apps/daemon/src/index.ts",
@@ -67,6 +86,22 @@ test("cross-app import check allows packages, same-app relatives, and externals"
       "import { latestTodoWriteInputFromMessages } from '../runtime/todos.ts';",
       "import path from 'node:path';",
       "import React from 'react';",
+    ].join("\n"),
+    registry,
+  );
+
+  assert.deepEqual(violations, []);
+});
+
+test("cross-app import check ignores quoted snippets and comments", () => {
+  const violations = collectCrossAppImportViolationsFromSource(
+    "apps/web/tests/import-boundary-fixture.test.ts",
+    [
+      "const snippet = \"import { x } from '@open-design/daemon/src/server.ts';\";",
+      "// import { y } from '@open-design/daemon/src/server.ts';",
+      "/*",
+      "require('@open-design/daemon/dist/cli.js');",
+      "*/",
     ].join("\n"),
     registry,
   );

@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import ts from "typescript";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -18,7 +19,7 @@ const crossAppImportSkippedDirectories = new Set([
   "test-results",
 ]);
 
-const crossAppImportSourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts"]);
+const crossAppImportSourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 
 export type AppDirectoryRegistry = {
   // app directory name under apps/ (e.g. "daemon") -> package name (e.g. "@open-design/daemon")
@@ -50,26 +51,13 @@ const crossAppImportAllowlist: CrossAppImportAllowlistEntry[] = [
   },
 ];
 
-const importSpecifierPatterns = [
-  // import defaultExport, { named as alias } from '...' / import type { T } from '...'
-  /\bimport\s+(?:type\s+)?[\w$*{},\s]*?\bfrom\s*['"]([^'"\n]+)['"]/g,
-  // side-effect import '...' (not CSS @import, which can appear in fixture strings)
-  /(?<!@)\bimport\s*['"]([^'"\n]+)['"]/g,
-  // export { x } from '...' / export * from '...' / export type { T } from '...'
-  /\bexport\s+(?:type\s+)?[\w$*{},\s]*?\bfrom\s*['"]([^'"\n]+)['"]/g,
-  // dynamic import('...')
-  /\bimport\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g,
-  // require('...')
-  /\brequire\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g,
-];
-
-function lineNumberForIndex(source: string, index: number): number {
-  return source.slice(0, index).split("\n").length;
-}
-
 function appDirectoryForRepositoryPath(repositoryPath: string): string | null {
   const [scope, appDirectory] = repositoryPath.split("/");
   return scope === "apps" && appDirectory ? appDirectory : null;
+}
+
+export function isCrossAppImportSourceFile(fileName: string): boolean {
+  return crossAppImportSourceExtensions.has(path.extname(fileName));
 }
 
 function isCrossAppImportAllowlisted(repositoryPath: string, specifier: string): boolean {
@@ -110,6 +98,80 @@ function targetAppForSpecifier(
   return null;
 }
 
+type ImportSpecifierReference = {
+  index: number;
+  specifier: string;
+};
+
+function scriptKindForRepositoryPath(repositoryPath: string): ts.ScriptKind {
+  switch (path.extname(repositoryPath)) {
+    case ".js":
+      return ts.ScriptKind.JS;
+    case ".jsx":
+      return ts.ScriptKind.JSX;
+    case ".mjs":
+      return ts.ScriptKind.JS;
+    case ".cjs":
+      return ts.ScriptKind.JS;
+    case ".tsx":
+      return ts.ScriptKind.TSX;
+    case ".mts":
+      return ts.ScriptKind.TS;
+    case ".cts":
+      return ts.ScriptKind.TS;
+    default:
+      return ts.ScriptKind.TS;
+  }
+}
+
+function stringLiteralReference(node: ts.Node, sourceFile: ts.SourceFile): ImportSpecifierReference | null {
+  if (!ts.isStringLiteralLike(node)) return null;
+  return { index: node.getStart(sourceFile), specifier: node.text };
+}
+
+function collectImportSpecifierReferences(repositoryPath: string, source: string): ImportSpecifierReference[] {
+  const sourceFile = ts.createSourceFile(
+    repositoryPath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKindForRepositoryPath(repositoryPath),
+  );
+  const references: ImportSpecifierReference[] = [];
+
+  const pushStringLiteral = (node: ts.Node | undefined): void => {
+    if (node == null) return;
+    const reference = stringLiteralReference(node, sourceFile);
+    if (reference != null) references.push(reference);
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node)) {
+      pushStringLiteral(node.moduleSpecifier);
+    } else if (ts.isExportDeclaration(node)) {
+      pushStringLiteral(node.moduleSpecifier);
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+      pushStringLiteral(node.moduleReference.expression);
+    } else if (ts.isImportTypeNode(node)) {
+      if (ts.isLiteralTypeNode(node.argument)) {
+        pushStringLiteral(node.argument.literal);
+      }
+    } else if (ts.isCallExpression(node)) {
+      const firstArgument = node.arguments[0];
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        pushStringLiteral(firstArgument);
+      } else if (ts.isIdentifier(node.expression) && node.expression.text === "require") {
+        pushStringLiteral(firstArgument);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return references;
+}
+
 export function collectCrossAppImportViolationsFromSource(
   repositoryPath: string,
   source: string,
@@ -117,27 +179,29 @@ export function collectCrossAppImportViolationsFromSource(
 ): CrossAppImportViolation[] {
   const violations: CrossAppImportViolation[] = [];
   const seen = new Set<string>();
+  const sourceFile = ts.createSourceFile(
+    repositoryPath,
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    scriptKindForRepositoryPath(repositoryPath),
+  );
 
-  for (const pattern of importSpecifierPatterns) {
-    for (const match of source.matchAll(pattern)) {
-      const specifier = match[1];
-      if (specifier === undefined) continue;
+  for (const reference of collectImportSpecifierReferences(repositoryPath, source)) {
+    const dedupeKey = `${reference.index}\0${reference.specifier}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
 
-      const dedupeKey = `${match.index}\0${specifier}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
+    const targetApp = targetAppForSpecifier(repositoryPath, reference.specifier, registry);
+    if (targetApp == null || isCrossAppImportAllowlisted(repositoryPath, reference.specifier)) continue;
 
-      const targetApp = targetAppForSpecifier(repositoryPath, specifier, registry);
-      if (targetApp == null || isCrossAppImportAllowlisted(repositoryPath, specifier)) continue;
-
-      violations.push({
-        filePath: repositoryPath,
-        lineNumber: lineNumberForIndex(source, match.index ?? 0),
-        specifier,
-        targetApp,
-        reason: `apps must not import another app's private implementation (apps/${targetApp}); integrate via HTTP APIs and packages/contracts`,
-      });
-    }
+    violations.push({
+      filePath: repositoryPath,
+      lineNumber: sourceFile.getLineAndCharacterOfPosition(reference.index).line + 1,
+      specifier: reference.specifier,
+      targetApp,
+      reason: `apps must not import another app's private implementation (apps/${targetApp}); integrate via HTTP APIs and packages/contracts`,
+    });
   }
 
   return violations.sort((left, right) => left.lineNumber - right.lineNumber);
@@ -178,7 +242,7 @@ async function collectAppSourceFiles(directory: string): Promise<string[]> {
       continue;
     }
 
-    if (entry.isFile() && crossAppImportSourceExtensions.has(path.extname(entry.name))) {
+    if (entry.isFile() && isCrossAppImportSourceFile(entry.name)) {
       files.push(fullPath);
     }
   }
