@@ -186,7 +186,6 @@ export const HOME_HERO_CHIPS: ReadonlyArray<HomeHeroChip> = [
       pluginId: 'example-guizang-social-card',
       projectKind: 'image',
       inputs: {
-        platform: 'xiaohongshu',
         styleMode: 'auto',
         pageCount: '5-9',
       },

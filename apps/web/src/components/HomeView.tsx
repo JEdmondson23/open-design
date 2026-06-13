@@ -1464,7 +1464,7 @@ export function HomeView({
     // fields (`subject`/`style`/`aspect`/`mediaKind` stay), so the
     // od-media-generation apply still validates.
     const submittedPluginInputs = submittedActive
-      ? stripArtifactFooterInputs(submittedApplyInputs)
+      ? stripArtifactFooterInputs(submittedApplyInputs, submittedActive.chipId)
       : defaultInputs;
     const activeInputsChangedForSubmit = submittedActive
       ? !inputsEqual(submittedActive.result?.appliedPlugin?.inputs ?? submittedActive.inputs, submittedPluginInputs)
@@ -1894,19 +1894,24 @@ const ARTIFACT_FOOTER_FIELD_NAMES = new Set([
   'voice',
 ]);
 
-// The prototype/deck footer no longer exposes these settings, so any plugin
-// default for them must NOT be seeded into the Home composer's inputs — that
-// would forward a prefilled value (e.g. `fidelity: high-fidelity`) to the run
-// instead of leaving it "unknown" for the first-turn discovery flow to ask.
+// The prototype/deck/media footer no longer exposes these settings, so any
+// plugin default for them must NOT be forwarded to the run. Social card also
+// defers `platform`: the single Home chip covers Xiaohongshu/Rednote and
+// WeChat cover pairs, so first-turn discovery must collect the target package.
 function stripArtifactFooterInputs(
   inputs: Record<string, unknown>,
+  chipId?: string | null,
 ): Record<string, unknown> {
-  if (!Object.keys(inputs).some((key) => ARTIFACT_FOOTER_FIELD_NAMES.has(key))) {
+  const deferredNames =
+    chipId === 'social-card'
+      ? new Set([...ARTIFACT_FOOTER_FIELD_NAMES, 'platform'])
+      : ARTIFACT_FOOTER_FIELD_NAMES;
+  if (!Object.keys(inputs).some((key) => deferredNames.has(key))) {
     return inputs;
   }
   const next: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(inputs)) {
-    if (ARTIFACT_FOOTER_FIELD_NAMES.has(key)) continue;
+    if (deferredNames.has(key)) continue;
     next[key] = value;
   }
   return next;

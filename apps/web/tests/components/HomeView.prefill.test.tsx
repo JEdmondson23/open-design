@@ -267,6 +267,55 @@ const LIVE_ARTIFACT_IMAGE_TEMPLATE_PLUGIN = {
   },
 };
 
+const SOCIAL_CARD_PLUGIN = {
+  ...DEFAULT_PLUGIN,
+  id: 'example-guizang-social-card',
+  title: 'Guizang Social Card',
+  source: '/tmp/guizang-social-card',
+  fsPath: '/tmp/guizang-social-card',
+  manifest: {
+    ...DEFAULT_PLUGIN.manifest,
+    name: 'example-guizang-social-card',
+    title: 'Guizang Social Card',
+    description: 'Create Xiaohongshu/Rednote carousels and WeChat cover pairs.',
+    od: {
+      kind: 'scenario',
+      taskKind: 'new-generation',
+      mode: 'image',
+      surface: 'web',
+      scenario: 'marketing',
+      useCase: {
+        query: 'Use the Guizang Social Card workflow to turn my source content into a {{platform}} social card package.',
+      },
+      inputs: [
+        {
+          name: 'platform',
+          type: 'select',
+          required: false,
+          label: 'Platform',
+          options: ['xiaohongshu', 'wechat-cover-pair', 'social-card'],
+          default: 'xiaohongshu',
+        },
+        {
+          name: 'styleMode',
+          type: 'select',
+          required: false,
+          label: 'Style mode',
+          options: ['auto', 'editorial', 'swiss'],
+          default: 'auto',
+        },
+        {
+          name: 'pageCount',
+          type: 'string',
+          required: false,
+          label: 'Page count',
+          default: '5-9',
+        },
+      ],
+    },
+  },
+};
+
 const AUTHORING_DEFAULT_SCENARIO_INPUTS = {
   artifactKind: 'Open Design plugin',
   audience: 'Open Design plugin authors',
@@ -408,6 +457,24 @@ const LIVE_ARTIFACT_APPLY_RESULT = {
   },
   projectMetadata: {
     skillId: 'live-artifact',
+  },
+};
+
+const SOCIAL_CARD_APPLY_RESULT = {
+  ...AUTHORING_APPLY_RESULT,
+  query: SOCIAL_CARD_PLUGIN.manifest.od.useCase.query,
+  inputs: SOCIAL_CARD_PLUGIN.manifest.od.inputs,
+  appliedPlugin: {
+    ...AUTHORING_APPLY_RESULT.appliedPlugin,
+    snapshotId: 'snap-social-card',
+    pluginId: 'example-guizang-social-card',
+    inputs: {
+      styleMode: 'auto',
+      pageCount: '5-9',
+    },
+  },
+  projectMetadata: {
+    kind: 'image',
   },
 };
 
@@ -784,6 +851,76 @@ describe('HomeView prompt handoff', () => {
       { pluginInputs?: Record<string, unknown> },
     ];
     expect(protoSubmittedInputs).not.toHaveProperty('fidelity');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('leaves Social card platform unanswered so discovery can ask for the target package', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (url) => {
+      if (typeof url === 'string' && url === '/api/plugins') {
+        return new Response(JSON.stringify({ plugins: [SOCIAL_CARD_PLUGIN] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (typeof url === 'string' && url.includes('/apply')) {
+        return new Response(JSON.stringify(SOCIAL_CARD_APPLY_RESULT), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    stubAnimationFrame();
+    const onSubmit = vi.fn();
+
+    render(
+      <HomeView
+        projects={[]}
+        designSystems={[]}
+        defaultDesignSystemId={null}
+        onSubmit={onSubmit}
+        onOpenProject={() => undefined}
+        onViewAllProjects={() => undefined}
+      />,
+    );
+
+    await clearActiveTypeChip();
+    fireEvent.click(await screen.findByTestId('home-hero-rail-social-card'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('home-hero-active-type-chip').textContent).toContain('Social card');
+    });
+    expect(fetchMock.mock.calls.some(([url]) => (
+      typeof url === 'string' && url.includes('/api/plugins/example-guizang-social-card/apply')
+    ))).toBe(false);
+    expect(homeHeroPromptValue()).toBe('');
+
+    await setPromptAndSettle('Turn this article into a WeChat cover pair.');
+    fireEvent.click(screen.getByTestId('home-hero-submit'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/plugins/example-guizang-social-card/apply',
+      expect.anything(),
+    ));
+    const applyCall = fetchMock.mock.calls.find(([url]) => (
+      typeof url === 'string' && url.includes('/api/plugins/example-guizang-social-card/apply')
+    ));
+    const applyInputs = JSON.parse(String((applyCall?.[1] as RequestInit).body)).inputs;
+    expect(applyInputs).toEqual({
+      styleMode: 'auto',
+      pageCount: '5-9',
+    });
+    expect(applyInputs).not.toHaveProperty('platform');
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      pluginId: 'example-guizang-social-card',
+      projectKind: 'image',
+      prompt: 'Turn this article into a WeChat cover pair.',
+      pluginInputs: {
+        styleMode: 'auto',
+        pageCount: '5-9',
+      },
+    })));
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
