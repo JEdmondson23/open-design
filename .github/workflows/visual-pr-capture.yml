@@ -75,8 +75,8 @@ jobs:
 
       - name: Write capture manifest
         run: |
-          mkdir -p e2e/ui/reports/visual-report
-          cat > e2e/ui/reports/visual-report/manifest.json <<'JSON'
+          mkdir -p e2e/ui/reports/visual-report/manifests
+          cat > "e2e/ui/reports/visual-report/manifests/${{ matrix.name }}.json" <<'JSON'
           {
             "pr_number": "${{ github.event.pull_request.number }}",
             "head_sha": "${{ github.event.pull_request.head.sha }}",
@@ -96,6 +96,6 @@ jobs:
           path: |
             e2e/ui/reports/visual-screenshots
             e2e/ui/reports/visual-results.json
-            e2e/ui/reports/visual-report/manifest.json
+            e2e/ui/reports/visual-report/manifests
           if-no-files-found: ignore
           retention-days: 7

@@ -75,19 +75,55 @@ jobs:
         run: |
           set -euo pipefail
           artifact_dir="$RUNNER_TEMP/visual-artifact"
-          manifest="$artifact_dir/visual-report/manifest.json"
-          if [ ! -f "$manifest" ]; then
-            manifest="$artifact_dir/manifest.json"
+          mapfile -t manifests < <(find "$artifact_dir/visual-report/manifests" -maxdepth 1 -type f -name '*.json' 2>/dev/null | sort)
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            if [ -f "$artifact_dir/visual-report/manifest.json" ]; then
+              manifests=("$artifact_dir/visual-report/manifest.json")
+            elif [ -f "$artifact_dir/manifest.json" ]; then
+              manifests=("$artifact_dir/manifest.json")
+            fi
           fi
-          if [ ! -f "$manifest" ]; then
+          if [ "${#manifests[@]}" -eq 0 ]; then
             echo "Capture manifest not found" >&2
             find "$artifact_dir" -maxdepth 4 -type f >&2
             exit 1
           fi
+          manifest="${manifests[0]}"
           manifest_pr_number="$(jq -r '.pr_number' "$manifest")"
           base_sha="$(jq -r '.base_sha' "$manifest")"
           run_id="$(jq -r '.run_id' "$manifest")"
-          capture_outcome="$(jq -r '.capture_outcome // "success"' "$manifest")"
+          manifest_head="$(jq -r '.head_sha' "$manifest")"
+          capture_outcome=success
+          for shard_manifest in "${manifests[@]}"; do
+            shard_pr_number="$(jq -r '.pr_number' "$shard_manifest")"
+            shard_base_sha="$(jq -r '.base_sha' "$shard_manifest")"
+            shard_run_id="$(jq -r '.run_id' "$shard_manifest")"
+            shard_head_sha="$(jq -r '.head_sha' "$shard_manifest")"
+            shard_outcome="$(jq -r '.capture_outcome // "success"' "$shard_manifest")"
+            if [ "$shard_pr_number" != "$manifest_pr_number" ]; then
+              echo "Manifest $shard_manifest pr_number ($shard_pr_number) does not match $manifest_pr_number." >&2
+              exit 1
+            fi
+            if [ "$shard_base_sha" != "$base_sha" ]; then
+              echo "Manifest $shard_manifest base_sha ($shard_base_sha) does not match $base_sha." >&2
+              exit 1
+            fi
+            if [ "$shard_run_id" != "$run_id" ]; then
+              echo "Manifest $shard_manifest run_id ($shard_run_id) does not match $run_id." >&2
+              exit 1
+            fi
+            if [ "$shard_head_sha" != "$manifest_head" ]; then
+              echo "Manifest $shard_manifest head_sha ($shard_head_sha) does not match $manifest_head." >&2
+              exit 1
+            fi
+            if ! [[ "$shard_outcome" =~ ^(success|failure|cancelled|skipped)$ ]]; then
+              echo "Invalid manifest capture_outcome in $shard_manifest: $shard_outcome" >&2
+              exit 1
+            fi
+            if [ "$shard_outcome" != "success" ]; then
+              capture_outcome=failure
+            fi
+          done
           if ! [[ "$manifest_pr_number" =~ ^[0-9]+$ ]]; then
             echo "Invalid manifest pr_number: $manifest_pr_number" >&2
             exit 1
@@ -98,10 +134,6 @@ jobs:
           fi
           if [ "$run_id" != "$WORKFLOW_RUN_ID" ]; then
             echo "Artifact run_id ($run_id) does not match workflow_run id ($WORKFLOW_RUN_ID)." >&2
-            exit 1
-          fi
-          if ! [[ "$capture_outcome" =~ ^(success|failure|cancelled|skipped)$ ]]; then
-            echo "Invalid manifest capture_outcome: $capture_outcome" >&2
             exit 1
           fi
           source_head_sha="$WORKFLOW_HEAD_SHA"
@@ -119,7 +151,6 @@ jobs:
               source_head_branch="$(jq -r '.head_branch // empty' <<< "$run_json")"
             fi
           fi
-          manifest_head="$(jq -r '.head_sha' "$manifest")"
           if ! [[ "$manifest_head" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Invalid manifest head_sha: $manifest_head" >&2
             exit 1
