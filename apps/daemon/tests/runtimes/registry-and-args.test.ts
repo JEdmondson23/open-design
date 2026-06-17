@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import {
-  AGENT_DEFS, amp, assert, chmodSync, codex, cursorAgent, detectAgents, grokBuild, join, mkdtempSync, rmSync, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
+  AGENT_DEFS, amp, assert, chmodSync, claude, codex, cursorAgent, detectAgents, grokBuild, join, mkdtempSync, rmSync, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
 } from './helpers/test-helpers.js';
 import { codexNeedsDangerFullAccessSandbox } from '../../src/runtimes/defs/codex.js';
 import { readLocalAgentProfileDefs } from '../../src/runtimes/registry.js';
@@ -365,6 +365,42 @@ test('codex model picker includes current OpenAI choices in priority order', asy
       assert.equal(detected.available, true);
       assert.equal(detected.version, 'codex 1.0.0');
       assert.deepEqual(detected.models.map((m: { id: string }) => m.id), expectedModels);
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('claude probes auth status so rescans reflect CLI auth changes', async () => {
+  assert.deepEqual(claude.authProbe, {
+    args: ['auth', 'status'],
+    timeoutMs: 5000,
+  });
+
+  const dir = mkdtempSync(join(tmpdir(), 'od-agents-claude-auth-'));
+  try {
+    await withEnvSnapshot(['PATH', 'OD_AGENT_HOME', 'CLAUDE_BIN'], async () => {
+      const claudeBin = join(dir, 'claude');
+      writeFileSync(
+        claudeBin,
+        `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "2.1.168 (Claude Code)"; exit 0; fi
+if [ "$1" = "-p" ] && [ "$2" = "--help" ]; then echo "--include-partial-messages --add-dir"; exit 0; fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then echo '{"authenticated":true,"source":"claude.ai"}'; exit 0; fi
+exit 0
+`,
+      );
+      chmodSync(claudeBin, 0o755);
+      process.env.OD_AGENT_HOME = dir;
+      process.env.PATH = dir;
+      delete process.env.CLAUDE_BIN;
+
+      const agents = await detectAgents();
+      const detected = agents.find((agent) => agent.id === 'claude');
+
+      assert.ok(detected);
+      assert.equal(detected.available, true);
+      assert.equal(detected.authStatus, 'ok');
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
