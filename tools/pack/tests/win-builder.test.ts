@@ -159,6 +159,13 @@ describe("Windows pack artifact boundaries", () => {
     expect(payloadSource).toContain("const WIN_LAUNCHER_PAYLOAD_BASE_CACHE_VERSION = 2");
     expect(payloadSource).toContain("const WIN_LAUNCHER_PAYLOAD_ARCHIVE_CACHE_VERSION = 2");
   });
+
+  it("invalidates the NSIS installer cache when installer helper code changes", async () => {
+    const source = await readFile(new URL("../src/win/builder.ts", import.meta.url), "utf8");
+    expect(source).toContain("hashWinNsisInstallerImplementation");
+    expect(source).toContain("nsisInstallerImplementation");
+    expect(source.indexOf("nsisInstallerImplementation")).toBeLessThan(source.indexOf('target: "nsis-installer"'));
+  });
 });
 
 describe("launcher runtime sync helper", () => {
