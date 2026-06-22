@@ -42,9 +42,30 @@ The existing infra is "specify-style": the daemon mints `newSessionId` and passe
   - **DB transcript fallback** (things we cannot control — user deletion, corruption, different machine): detect the agent's session-not-found signal → clear the stale handle in `agent_sessions` → start a fresh session and **re-seed the full flattened transcript** (`skipTranscript=false`). We already store the full transcript (`messages.content` + `events_json`), so the worst case is **one cold turn with full context**, never a broken/amnesiac conversation. This is byte-for-byte the existing claude `isClaudeResumeFailure` fallback, generalized.
 - Net effect: **only-upside** — resume hits the cache when the session is present and warm; a missing session degrades exactly to today's behavior for that one turn.
 
-### Invalidation & lifecycle
+### Resume identity & invalidation tuple
 
-- Force a new session on model / cwd / project / MCP+tool-contract / prompt-hash / memory change (reuse the daemon's existing resume keying); cancellation must not leave a dangling session; resume must not reintroduce the #3380 lost-edit-state failure (the resumed session is authoritative; we do not also replay flattened history when the handle is valid).
+The stored `agent_sessions` row is keyed by `(conversation_id, agent_id)` and, before this work, only carried `session_id` + `stable_prompt_hash`. That is **not** sufficient to decide a resume is safe: it does not encode the model, the cwd, or how far the conversation had advanced when the session last ran, so a model/cwd switch — or another agent (or an edit) adding turns the upstream session never saw — would keep resuming a stale session and silently drop visible state. The skip-transcript path must therefore be gated on an explicit **resume identity**, not on "a row exists".
+
+Stored with the session row (in addition to `session_id`, `stable_prompt_hash`):
+
+- `model` — the model the upstream session was created under.
+- `cwd` — the resolved working directory (workspace identity).
+- `last_message_id` — the assistant message the session produced on its last turn (the conversation cursor).
+
+At resolve time the session is resumable **iff all hold** (else `isResuming = false`, with an `invalidationReason`, and the daemon reseeds the full transcript):
+
+| Guard | Resumable when | `invalidationReason` on mismatch |
+| --- | --- | --- |
+| model | stored `model` == current run model | `model_changed` |
+| cwd | stored `cwd` == current run cwd | `cwd_changed` |
+| conversation cursor | the latest completed assistant message (excluding **this** run's in-flight placeholder) == stored `last_message_id` | `conversation_advanced` |
+| cursor present | stored `last_message_id` is non-null | `missing_cursor` (legacy row → reseed once) |
+
+The cursor advances on every successful create **and** resume turn (so back-to-back same-agent turns keep resuming). `tool-contract` / `prompt-hash` / `memory` changes are already absorbed by `stable_prompt_hash` (a changed hash re-sends the stable block on the resumed session); only changes that make the upstream session *wrong to continue* force a fresh session. Cancellation must not leave a dangling session; resume must not reintroduce the #3380 lost-edit-state failure (the resumed session is authoritative; we do not also replay flattened history when the handle is valid).
+
+> Status: **implemented for codex/opencode in the implementation PR**. Acceptance tests: a `resolveAgentResumeContext` invalidation matrix (in-sync resume, current-placeholder-excluded follow-up, `model_changed`, `cwd_changed`, `conversation_advanced`, `missing_cursor`) plus an end-to-end `codex -> other agent -> codex` spec asserting the second codex turn starts a fresh session (no resume) instead of dropping the intervening turn. The AMR runtime applies the same caller-side contract.
+>
+> Related: issue #744 ("Alternative path: use native CLI resume/continue plus sessionMap instead of full transcript reinjection") describes the same approach this spec formalizes.
 
 ### Complementary: cacheable-prefix stabilization (for the non-resumable agents)
 
