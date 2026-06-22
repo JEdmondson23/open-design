@@ -1028,4 +1028,26 @@ describe('classifyRunFailure — batch A reclassification out of execution_faile
     expect(result?.failure_detail).toBe('local_model_not_loaded');
     expect(result?.user_action).toBe('switch_model');
   });
+
+  it('classifies a stale Claude session resume as a retryable session_resume_expired', () => {
+    // The daemon already cleared the stale session id; the next turn starts
+    // fresh. This is recoverable, not an opaque engine crash.
+    const result = classify(
+      'AGENT_EXECUTION_FAILED',
+      'The previous Claude session could not be resumed (it may have expired). Resend your message to continue with a fresh session.',
+    );
+    expect(result?.failure_category).toBe('process_exit');
+    expect(result?.failure_detail).toBe('session_resume_expired');
+    expect(result?.retryable).toBe(true);
+    expect(result?.user_action).toBe('retry');
+  });
+
+  it('classifies the raw Claude CLI "no conversation found with session id" as session_resume_expired', () => {
+    const result = classify(
+      'AGENT_EXECUTION_FAILED',
+      'no conversation found with session id 1d2c3b4a-0000-0000-0000-000000000000',
+    );
+    expect(result?.failure_category).toBe('process_exit');
+    expect(result?.failure_detail).toBe('session_resume_expired');
+  });
 });

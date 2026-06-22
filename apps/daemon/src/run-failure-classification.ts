@@ -204,6 +204,18 @@ function isAuthDetailText(text: string): boolean {
     .test(text);
 }
 
+// A resume target that no longer exists. Matches both the daemon's own
+// surfaced message and the Claude CLI's raw "session not found" shapes.
+function isSessionResumeExpiredText(text: string): boolean {
+  // Tightly anchored to Claude's actual resume-miss shapes. The session-id form
+  // requires the id token immediately before "not found" so it cannot bridge an
+  // unrelated "session …" and a far-away "404 Not Found" (e.g. opencode 4xx).
+  return /\bcould not be resumed\b/i.test(text) ||
+    /\bno conversation found with session id\b/i.test(text) ||
+    /\bno session found\b/i.test(text) ||
+    /\bsession [\w-]+ not found\b/i.test(text);
+}
+
 function isPromptTooLargeText(text: string): boolean {
   // `prefill context too large` is the local-runtime (MLX) shape of the same
   // "the prompt does not fit" failure that currently leaks into execution_failed.
@@ -518,6 +530,22 @@ export function classifyRunFailure(
       'model_select',
       false,
       'switch_model',
+    );
+  }
+
+  // A `--resume <id>` whose stored session no longer resolves (Claude's 30-day
+  // cleanupPeriodDays prune, a CLAUDE_CONFIG_DIR change, a cwd/worktree change,
+  // or a prior run killed before the session was flushed). The daemon already
+  // clears the stale id so the next turn starts fresh — this is a recoverable
+  // session-lifecycle failure, not an opaque engine crash, so name it and mark
+  // it retryable instead of letting it sit in execution_failed. (#3408 P1)
+  if (isSessionResumeExpiredText(text)) {
+    return classification(
+      'process_exit',
+      'session_resume_expired',
+      'session_init',
+      true,
+      'retry',
     );
   }
 

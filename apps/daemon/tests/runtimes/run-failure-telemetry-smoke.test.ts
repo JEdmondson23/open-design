@@ -235,6 +235,11 @@ describe('run failure telemetry smoke', () => {
       'a-lmstudio',
       "No models loaded. Please load a model in the developer page or use the 'lms load' command.",
     );
+    await writeFakeClaude(
+      binDir,
+      'a-resume-expired',
+      'no conversation found with session id 1d2c3b4a-0000-0000-0000-000000000000',
+    );
 
     process.env.OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS = '5000';
     delete process.env.POSTHOG_KEY;
@@ -254,6 +259,7 @@ describe('run failure telemetry smoke', () => {
       { bin: 'a-thread-start', category: 'process_exit', detail: 'agent_protocol_error' },
       { bin: 'a-auth', category: 'auth', detail: 'auth_required' },
       { bin: 'a-lmstudio', category: 'model_unavailable', detail: 'local_model_not_loaded' },
+      { bin: 'a-resume-expired', category: 'process_exit', detail: 'session_resume_expired' },
     ] as const;
 
     for (const item of cases) {
