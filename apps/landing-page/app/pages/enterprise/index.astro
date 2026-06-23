@@ -135,7 +135,7 @@ const COPY = {
     privacyNote: 'We only use this to contact you about Open Design for teams. No spam.',
     optional: 'optional',
     requiredError: 'This field is required.',
-    emailError: 'Enter a valid work email.',
+    emailError: 'Enter a valid work email — personal mailboxes (Gmail, QQ, 163…) are not accepted.',
   },
   zh: {
     metaTitle: 'Workspace 团队版 — Open Design',
@@ -206,7 +206,7 @@ const COPY = {
     privacyNote: '我们只会用它就 Open Design 团队版与你联系,不会发垃圾信息。',
     optional: '选填',
     requiredError: '此项必填。',
-    emailError: '请输入有效的工作邮箱。',
+    emailError: '请输入有效的企业邮箱，暂不支持个人邮箱（Gmail、QQ、163 等）。',
   },
   'zh-tw': {
     metaTitle: 'Workspace 團隊版 — Open Design',
@@ -277,7 +277,7 @@ const COPY = {
     privacyNote: '我們只會用它就 Open Design 團隊版與你聯絡,不會發垃圾訊息。',
     optional: '選填',
     requiredError: '此項必填。',
-    emailError: '請輸入有效的工作信箱。',
+    emailError: '請輸入有效的企業信箱，暫不支援個人信箱（Gmail、QQ、163 等）。',
   },
 } satisfies Record<string, EnterpriseCopy>;
 
@@ -635,6 +635,25 @@ const jsonLd = {
       // Inline validation — the form is `novalidate`, so we never trigger the
       // browser's native validation bubble; we show our own styled messages.
       const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      // Personal mailboxes are rejected client-side too; the Function enforces
+      // the same list authoritatively. Keep in sync with contact-sales.ts.
+      const PERSONAL_EMAIL_DOMAINS = new Set([
+        'gmail.com', 'googlemail.com',
+        'outlook.com', 'outlook.com.cn', 'hotmail.com', 'hotmail.co.uk', 'live.com', 'live.cn', 'msn.com',
+        'yahoo.com', 'yahoo.com.cn', 'yahoo.co.jp', 'ymail.com', 'rocketmail.com',
+        'icloud.com', 'me.com', 'mac.com',
+        'aol.com', 'gmx.com', 'gmx.net', 'mail.com', 'zoho.com',
+        'protonmail.com', 'proton.me', 'tutanota.com', 'yandex.com',
+        'qq.com', 'vip.qq.com', 'foxmail.com',
+        '163.com', '126.com', 'yeah.net', '188.com',
+        'sina.com', 'sina.cn', 'vip.sina.com', 'sohu.com', 'vip.sohu.com',
+        'aliyun.com', '139.com', '189.cn', 'wo.cn', '21cn.com', 'tom.com', '263.net', 'china.com',
+      ]);
+      const isBusinessEmail = (email) => {
+        const at = email.lastIndexOf('@');
+        if (at < 0) return false;
+        return !PERSONAL_EMAIL_DOMAINS.has(email.slice(at + 1).toLowerCase());
+      };
       const fieldInput = (id) => document.getElementById('ent-' + id);
       const fieldErr = (id) => document.getElementById('ent-' + id + '-error');
       const setInvalid = (id, bad) => {
@@ -647,7 +666,7 @@ const jsonLd = {
         const input = fieldInput(id);
         if (!input) return true;
         const bad = id === 'email'
-          ? !EMAIL_RE.test(input.value.trim())
+          ? !EMAIL_RE.test(input.value.trim()) || !isBusinessEmail(input.value.trim())
           : input.value.trim() === '';
         setInvalid(id, bad);
         return !bad;
