@@ -225,13 +225,13 @@ describe('InlineModelSwitcher AMR row', () => {
     const amrButton = await within(popover).findByRole('radio', {
       name: /^Open Design\s+Sign in$/i,
     });
-    expect(within(amrButton).getByText(/Sign in/i)).toBeTruthy();
     expect(amrButton.querySelector('.inline-switcher__agent-status-icon')).toBeNull();
-    expect(amrButton.querySelector('.inline-switcher__agent-action-label')).toBeTruthy();
+    expect(
+      amrButton.querySelector('.inline-switcher__agent-name')?.textContent,
+    ).toBe('Open Design');
     expect(within(popover).queryByText(/AMR \(vela\)/i)).toBeNull();
     expect(within(popover).queryByText(/vela/i)).toBeNull();
     expect(within(popover).queryByText(/Not signed in/i)).toBeNull();
-    expect(within(popover).queryByRole('button', { name: 'Sign in' })).toBeNull();
 
     const modelPicker = within(popover).getByTestId(
       'inline-model-switcher-agent-model',
@@ -311,7 +311,6 @@ describe('InlineModelSwitcher AMR row', () => {
     const amrButton = await within(popover).findByRole('radio', {
       name: /^Open Design\s+Signed in$/i,
     });
-    expect(within(amrButton).getByText(/Signed in/i)).toBeTruthy();
     expect(within(popover).queryByText(/manual-amr@example\.local/i)).toBeNull();
     expect(within(popover).queryByRole('button', { name: 'Sign out' })).toBeNull();
   });
@@ -606,7 +605,6 @@ describe('InlineModelSwitcher AMR row', () => {
     const amrButton = await within(popover).findByRole('radio', {
       name: /^Open Design\s+Signed in$/i,
     });
-    expect(within(amrButton).getByText(/Signed in/i)).toBeTruthy();
     expect(within(popover).queryByText(/@/i)).toBeNull();
     expect(within(popover).queryByRole('button', { name: 'Sign out' })).toBeNull();
   });
@@ -637,8 +635,11 @@ describe('InlineModelSwitcher AMR row', () => {
     const amrButton = await within(popover).findByRole('radio', {
       name: /^Open Design\s+Signing in/i,
     });
-    expect(within(amrButton).getByText(/Signing in/i)).toBeTruthy();
-    expect(within(amrButton).getByText('Cancel sign-in')).toBeTruthy();
+    expect(
+      within(popover)
+        .getByTestId('inline-model-switcher-account-action')
+        .getAttribute('title'),
+    ).toBe('Cancel sign-in');
   });
 
   it('refreshes stale signed-in AMR status before starting login', async () => {
@@ -745,7 +746,10 @@ describe('InlineModelSwitcher AMR row', () => {
         name: /^Open Design\s+Sign-in failed\./i,
       }),
     ).toBeNull();
-    expect(within(popover).getByText('Sign in')).toBeTruthy();
+    expect(
+      popover.querySelector('.inline-switcher__account-status.is-error')
+        ?.textContent,
+    ).toMatch(/api URL: is not configured/i);
   });
 
   it('cancels a timed-out AMR sign-in from the inline switcher', async () => {
@@ -809,7 +813,9 @@ describe('InlineModelSwitcher AMR row', () => {
     expect(
       within(popover).getByRole('radio', { name: /^Open Design\s+Sign-in failed\./i }),
     ).toBeTruthy();
-    expect(within(popover).getByText('Sign in')).toBeTruthy();
+    expect(
+      popover.querySelector('.inline-switcher__account-status.is-error'),
+    ).toBeTruthy();
     expect(popover.querySelector('.inline-switcher__agent-status-icon.is-error')).toBeNull();
   });
 
@@ -865,8 +871,11 @@ describe('InlineModelSwitcher AMR row', () => {
     amrButton = within(popover).getByRole('radio', {
       name: /^Open Design\s+Signing in/i,
     });
-    expect(within(amrButton).getByText(/Signing in/i)).toBeTruthy();
-    expect(within(amrButton).getByText('Cancel sign-in')).toBeTruthy();
+    expect(
+      within(popover)
+        .getByTestId('inline-model-switcher-account-action')
+        .getAttribute('title'),
+    ).toBe('Cancel sign-in');
 
     fireEvent.click(amrButton);
 

@@ -798,48 +798,58 @@ export function InlineModelSwitcher({
                   ) : amrLoggedIn ? (
                     <span className="inline-switcher__account-meta">
                       {amrBalanceLabel ? (
-                        <span className="inline-switcher__account-balance">
-                          {amrBalanceLabel}
+                        <span className="inline-switcher__account-meta-row">
+                          <span className="inline-switcher__account-meta-label">
+                            {t('settings.amrBalance')}
+                          </span>
+                          <span className="inline-switcher__account-balance">
+                            {amrBalanceLabel}
+                          </span>
                         </span>
                       ) : null}
                       {amrPlanLabel ? (
-                        <span className="inline-switcher__account-plan">
-                          {amrPlanLabel}
+                        <span className="inline-switcher__account-meta-row">
+                          <span className="inline-switcher__account-meta-label">
+                            {t('settings.amrPlan')}
+                          </span>
+                          <span className="inline-switcher__account-plan">
+                            {amrPlanLabel}
+                          </span>
+                          {amrCanUpgrade ? (
+                            <button
+                              type="button"
+                              className="inline-switcher__account-upgrade"
+                              data-testid="inline-model-switcher-account-upgrade"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const attribution = recordAmrEntry(
+                                  analytics.track,
+                                  'inline_amr_upgrade',
+                                  new Date(),
+                                  { metricsConsent: config.telemetry?.metrics === true },
+                                );
+                                const deviceId = amrHandoffDeviceId({
+                                  metricsConsent: config.telemetry?.metrics === true,
+                                  resolvedDeviceId: getResolvedDeviceId(),
+                                  installationId: config.installationId,
+                                });
+                                window.open(
+                                  attributedAmrUrl(
+                                    amrPlansUrlForProfile(
+                                      config.agentCliEnv?.amr?.OPEN_DESIGN_AMR_PROFILE,
+                                    ),
+                                    attribution,
+                                    deviceId,
+                                  ),
+                                  '_blank',
+                                  'noopener,noreferrer',
+                                );
+                              }}
+                            >
+                              {t('settings.amrUpgrade')}
+                            </button>
+                          ) : null}
                         </span>
-                      ) : null}
-                      {amrCanUpgrade ? (
-                        <button
-                          type="button"
-                          className="inline-switcher__account-upgrade"
-                          data-testid="inline-model-switcher-account-upgrade"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const attribution = recordAmrEntry(
-                              analytics.track,
-                              'inline_amr_upgrade',
-                              new Date(),
-                              { metricsConsent: config.telemetry?.metrics === true },
-                            );
-                            const deviceId = amrHandoffDeviceId({
-                              metricsConsent: config.telemetry?.metrics === true,
-                              resolvedDeviceId: getResolvedDeviceId(),
-                              installationId: config.installationId,
-                            });
-                            window.open(
-                              attributedAmrUrl(
-                                amrPlansUrlForProfile(
-                                  config.agentCliEnv?.amr?.OPEN_DESIGN_AMR_PROFILE,
-                                ),
-                                attribution,
-                                deviceId,
-                              ),
-                              '_blank',
-                              'noopener,noreferrer',
-                            );
-                          }}
-                        >
-                          {t('settings.amrUpgrade')}
-                        </button>
                       ) : null}
                     </span>
                   ) : (
