@@ -215,6 +215,55 @@ describe('visual report PNG sizing', () => {
     }
   });
 
+  test('treats tiny pixel diffs as unchanged visual noise', async () => {
+    const workDir = await mkdtemp(path.join(tmpdir(), 'visual-report-'));
+    try {
+      const outputDir = path.join(workDir, 'output');
+      const goodPath = path.join(workDir, 'visual-good.png');
+      const pngBuffer = PNG.sync.write(createFilledPng(2, 2));
+      await writeFile(goodPath, pngBuffer);
+
+      const r2 = {
+        bucket: 'visual-bucket',
+        publicOrigin: 'https://example.invalid',
+        client: {} as never,
+      };
+
+      const result = await compareCase(
+        {
+          r2,
+          prNumber: '12',
+          runId: '34',
+          headSha: 'b'.repeat(40),
+          visualCase: { name: 'visual-good', path: goodPath },
+          candidateShas: ['c'.repeat(40)],
+          outputDir,
+        },
+        {
+          putFile: async () => {},
+          findBaseline: async () => ({ sha: 'a'.repeat(40), key: 'baseline/visual-good.png', behindBy: 0 }),
+          downloadObject: async (_r2: unknown, _key: string, outputPath: string) => {
+            await mkdir(path.dirname(outputPath), { recursive: true });
+            await writeFile(outputPath, pngBuffer);
+          },
+          writeDiffPng: async (_mainPath: string, prPath: string, diffPath: string) => {
+            await mkdir(path.dirname(diffPath), { recursive: true });
+            await writeFile(diffPath, await readFile(prPath));
+            return 32;
+          },
+        },
+      );
+
+      expect(result).toMatchObject({
+        name: 'visual-good',
+        status: 'unchanged',
+        diffPixels: 32,
+      });
+    } finally {
+      await rm(workDir, { recursive: true, force: true });
+    }
+  });
+
   test('huge-dimension PNG headers fail before decode and upload', async () => {
     const workDir = await mkdtemp(path.join(tmpdir(), 'visual-report-'));
     try {

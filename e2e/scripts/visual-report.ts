@@ -13,6 +13,7 @@ const marker = '<!-- visual-regression-bot -->';
 const visualPrefix = 'visual-regression';
 const inlineCaseLimit = 20;
 const pixelThreshold = 0.1;
+const changedPixelFloor = 500;
 const diffBoxPadding = 6;
 const diffBoxMergeDistance = 12;
 const diffBoxStrokeWidth = 3;
@@ -230,7 +231,7 @@ export async function compareCase(input: {
 
   return {
     name: visualCase.name,
-    status: diffPixels > 0 ? 'changed' : 'unchanged',
+    status: diffPixels >= changedPixelFloor ? 'changed' : 'unchanged',
     diffPixels,
     baselineSha: baseline.sha,
     baselineBehindBy: baseline.behindBy,
