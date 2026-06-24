@@ -251,7 +251,7 @@ jobs:
         run: pnpm --filter @open-design/web test
 
   runner_perf_probe:
-    name: Runner perf probe (${{ matrix.name }})
+    name: Runner perf probe (${{ matrix.runner }} r${{ matrix.round }})
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.runner_perf_probe == true }}
     runs-on: ${{ fromJSON(matrix.runs_on) }}
     timeout-minutes: 10
@@ -259,12 +259,51 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: blacksmith-4vcpu
+          - runner: github-ubuntu-2404
+            round: 1
+            runs_on: '["ubuntu-24.04"]'
+          - runner: github-ubuntu-2404
+            round: 2
+            runs_on: '["ubuntu-24.04"]'
+          - runner: github-ubuntu-2404
+            round: 3
+            runs_on: '["ubuntu-24.04"]'
+          - runner: blacksmith-4vcpu
+            round: 1
             runs_on: '["blacksmith-4vcpu-ubuntu-2404"]'
-          - name: blacksmith-8vcpu
+          - runner: blacksmith-4vcpu
+            round: 2
+            runs_on: '["blacksmith-4vcpu-ubuntu-2404"]'
+          - runner: blacksmith-4vcpu
+            round: 3
+            runs_on: '["blacksmith-4vcpu-ubuntu-2404"]'
+          - runner: blacksmith-8vcpu
+            round: 1
             runs_on: '["blacksmith-8vcpu-ubuntu-2404"]'
-          - name: zxiyun-8vcpu
+          - runner: blacksmith-8vcpu
+            round: 2
+            runs_on: '["blacksmith-8vcpu-ubuntu-2404"]'
+          - runner: blacksmith-8vcpu
+            round: 3
+            runs_on: '["blacksmith-8vcpu-ubuntu-2404"]'
+          - runner: zxiyun-8vcpu
+            round: 1
             runs_on: '["self-hosted","Linux","X64","od-persistent-ci","od-zxiyun-poc"]'
+          - runner: zxiyun-8vcpu
+            round: 2
+            runs_on: '["self-hosted","Linux","X64","od-persistent-ci","od-zxiyun-poc"]'
+          - runner: zxiyun-8vcpu
+            round: 3
+            runs_on: '["self-hosted","Linux","X64","od-persistent-ci","od-zxiyun-poc"]'
+          - runner: contabo-6vcpu
+            round: 1
+            runs_on: '["self-hosted","Linux","X64","od-persistent-ci","od-ci-hot-poc"]'
+          - runner: contabo-6vcpu
+            round: 2
+            runs_on: '["self-hosted","Linux","X64","od-persistent-ci","od-ci-hot-poc"]'
+          - runner: contabo-6vcpu
+            round: 3
+            runs_on: '["self-hosted","Linux","X64","od-persistent-ci","od-ci-hot-poc"]'
 
     steps:
       - name: Checkout
@@ -280,6 +319,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "probe_started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "probe_runner=${{ matrix.runner }}"
+          echo "probe_round=${{ matrix.round }}"
           echo "host=$(hostname)"
           echo "kernel=$(uname -a)"
           if [ -r /etc/os-release ]; then
